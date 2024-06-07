@@ -1,0 +1,61 @@
+----https://doyensys.com/blogs/how-to-resolve-gaps-in-data-guard-apply-using-incremental-rman-backup/----
+Step-1: Check the SCN of Standby ( Data guard ) database and Find the lowest SCN from the following Queries.
+
+SQL> SELECT CURRENT_SCN FROM V$DATABASE;
+
+CURRENT_SCN
+--------------
+1165261
+
+SQL> select min(fhscn) from x$kcvfh;
+
+MIN(FHSCN)
+----------------
+1162291
+
+SQL> select min(kc.fhscn) from x$kcvfh f, v$datafile d where kc.hxfil =dd.file# and dd.enabled != 'READ ONLY';
+
+MIN(kc.FHSCN)
+----------------
+1161196
+Step-2: Stop the Dataguard MRP ( Apply ) Process and shutdown Standby database.
+
+SQL> alter database recover managed standby database cancel;
+
+SQL> shutdown immediate;
+Step-3: Take an Incremental Backup from Production database using the lowest SCN as follows.
+
+RMAN > backup incremental from scn 1161196 database format '/oracle/increment.rman' DEVICE TYPE DISK;
+Step-4: Transfer the Incremental backup to the Standby database from Production server.
+
+[oracle@msddbadm01 ~]$ scp incremental.rman 192.168.9.125:/oracle/backup/backup_Incre
+Step-5: Create a new Standby Controlfile on Production database and transfer it to Standby database.
+
+SQL> alter database create standby controlfile as '/oracle/stand01.ctl';
+
+
+[oracle@msddbadm01 ~]$ scp standby.ctl 192.168.9.125:/oracle/backup/
+Step-6: Startup Standby database in nomount mode.
+
+SQL> startup nomount
+Step-7: Restore new standby controlfile on Standby database.
+
+RMAN> restore standby controlfile from '/oracle/backup/standb01.ctl';
+Step-8: mount the standby database.
+
+SQL> alter database mount standby database;
+Database altered.
+Step-9: Catalog the new Incremental backups on Standby Server as follows.
+
+RMAN> catalog start with '/oracle/backup/';
+
+List of Cataloged Files
+=======================
+File Name: /oracle/backup/increment.rman
+
+Step-10: start Recover database on Standby database.
+
+RMAN> recover database;
+Step-11: Now you can start the MRP Process to apply new logs.
+
+SQL> ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE DISCONNECT FROM SESSION;
