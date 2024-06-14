@@ -1,0 +1,9 @@
+------statistic for some thing ------------
+select distinct NAME,
+       count (NAME)
+FROM   EMPLOYEE
+group by (NAME);
+
+-------- convert date ---------
+SELECT SYSTIMESTAMP;                      -> 14-JUN-24 07.46.59.122537 AM +00:00
+SELECT to_char(SYSTIMESTAMP,'YYYY-MM-DD') -> 2024-06-14
