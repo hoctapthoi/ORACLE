@@ -1,0 +1,305 @@
+1) Fixed IP, set Hostname
+vi /etc/hosts
+
+-- Public IP
+10.10.1.10  rac-node1
+10.10.1.11  rac-node2
+-- VIP IP
+10.10.1.12  rac-node1-vip
+10.10.1.13  rac-node2-vip
+-- Private/Interconnect IP
+192.168.10.10	rac-node1-priv
+192.168.10.11	rac-node2-priv
+-- SCAN IP
+10.10.1.14	orcl-scan
+
+2) Install packages
+mount /dev/cdrom /mnt
+cd /mnt/Packages/
+
+--- 2.1---------
+rpm -Uvh binutils-2.*
+rpm -Uvh elfutils-libelf-0.176-5.el7.x86_64.rpm
+rpm -Uvh glibc-2.17-317.0.1.el7.x86_64.rpm
+rpm -Uvh glibc-common-2.17-317.0.1.el7.x86_64.rpm
+rpm -Uvh ksh-20120801-142.0.1.el7.x86_64.rpm
+rpm -Uvh libaio-0.3.109-13.el7.x86_64.rpm
+rpm -Uvh libgcc-4.8.5-44.0.3.el7.x86_64.rpm
+rpm -Uvh libstdc++-4.8.5-44.0.3.el7.x86_64.rpm
+rpm -Uvh make-3.82-24.el7.x86_64.rpm
+rpm -Uvh zlib-devel-1.2.7-18.el7.x86_64.rpm
+rpm -Uvh elfutils-libelf-devel-0.176-5.el7.x86_64.rpm
+rpm -Uvh cpp-4.8.5-44.0.3.el7.x86_64.rpm
+rpm -Uvh kernel-headers-3.10.0-1160.el7.x86_64.rpm
+rpm -Uvh glibc-headers-2.17-317.0.1.el7.x86_64.rpm
+rpm -Uvh glibc-devel-2.17-317.0.1.el7.x86_64.rpm
+rpm -Uvh gcc-4.8.5-44.0.3.el7.x86_64.rpm
+rpm -Uvh libstdc++-devel-4.8.5-44.0.3.el7.x86_64.rpm
+rpm -Uvh gcc-c++-4.8.5-44.0.3.el7.x86_64.rpm
+
+rpm -Uvh unixODBC-2.3.1-14.0.1.el7.x86_64.rpm
+rpm -Uvh compat-libstdc++-33-3.2.3-72.el7.x86_64.rpm
+rpm -Uvh libaio-devel-0.3.109-13.el7.x86_64.rpm
+rpm -Uvh unixODBC-devel-2.3.1-14.0.1.el7.x86_64.rpm
+rpm -Uvh sysstat-10.1.5-19.el7.x86_64.rpm
+rpm -Uvh compat-libcap1-1.10-7.el7.x86_64.rpm
+
+
+-----2.2-----
+yum install -y GeoIP
+yum install -y bind-libs
+yum install -y bind-libs-lite
+yum install -y bind-license
+yum install -y bind-utils
+yum install -y compat-libcap1
+yum install -y geoipupdate
+yum install -y glibc-devel
+yum install -y glibc-headers
+yum install -y gssproxy
+yum install -y kernel-headers
+yum install -y keyutils
+yum install -y ksh
+yum install -y libICE
+yum install -y libSM
+yum install -y libX11
+yum install -y libX11-common
+yum install -y libXau
+yum install -y libXext
+yum install -y libXi
+yum install -y libXinerama
+yum install -y libXmu
+yum install -y libXrandr
+yum install -y libXrender
+yum install -y libXt
+yum install -y libXtst
+yum install -y libXv
+yum install -y libXxf86dga
+yum install -y libXxf86misc
+yum install -y libXxf86vm
+yum install -y libaio-devel
+yum install -y libbasicobjects
+yum install -y libcollection
+yum install -y libdmx
+yum install -y libevent
+yum install -y libini_config
+yum install -y libnfsidmap
+yum install -y libpath_utils
+yum install -y libref_array
+yum install -y libstdc++-devel
+yum install -y libtirpc
+yum install -y libverto-libevent
+yum install -y libxcb
+yum install -y lm_sensors-libs
+yum install -y mailx
+yum install -y net-tools
+yum install -y nfs-utils
+yum install -y psmisc
+yum install -y quota
+yum install -y quota-nls
+yum install -y rpcbind
+yum install -y smartmontools
+yum install -y sysstat
+yum install -y tcp_wrappers
+yum install -y unzip
+yum install -y xorg-x11-utils
+yum install -y xorg-x11-xauth
+
+
+ 3. Create users and edit profiles
+groupadd -g 200 oinstall
+groupadd -g 201 asmadmin
+groupadd -g 202 asmdba
+groupadd -g 203 asmoper
+groupadd -g 300 dba
+groupadd -g 301 oper
+useradd -m -u 210 -g oinstall -G asmadmin,asmdba,asmoper,dba -d /home/grid -s /bin/bash -c "Grid Infrastructure Owner" grid
+passwd grid
+useradd -m -u 310 -g oinstall -G dba,oper,asmdba -d /home/oracle -s /bin/bash -c "Oracle Software Owner" oracle
+passwd oracle
+
+su - grid
+vi .bash_profile
+
+if [ -f ~/.bashrc ]; then
+      . ~/.bashrc
+fi
+ORACLE_SID=+ASM1; export ORACLE_SID
+JAVA_HOME=/usr/local/java; export JAVA_HOME
+ORACLE_BASE=/u01/app/grid; export ORACLE_BASE
+ORACLE_HOME=/u01/app/19.3.0/grid; export ORACLE_HOME
+PATH=.:${JAVA_HOME}/bin:${PATH}:$HOME/bin:$ORACLE_HOME/bin
+export PATH
+LD_LIBRARY_PATH=$ORACLE_HOME/lib
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$ORACLE_HOME/oracm/lib
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/lib:/usr/lib:/usr/local/lib
+export LD_LIBRARY_PATH
+umask 022
+
+
+
+su - oracle
+
+vi .bash_profile
+
+if [ -f ~/.bashrc ]; then
+      . ~/.bashrc
+fi
+ORACLE_SID=orcl1; export ORACLE_SID
+JAVA_HOME=/usr/local/java; export JAVA_HOME
+ORACLE_BASE=/u01/app/oracle; export ORACLE_BASE
+ORACLE_HOME=$ORACLE_BASE/product/19.3.0/dbhome_1; export ORACLE_HOME
+PATH=.:${JAVA_HOME}/bin:${PATH}:$HOME/bin:$ORACLE_HOME/bin
+export PATH
+LD_LIBRARY_PATH=$ORACLE_HOME/lib
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$ORACLE_HOME/oracm/lib
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/lib:/usr/lib:/usr/local/lib
+export LD_LIBRARY_PATH
+export TEMP=/tmp
+export TMPDIR=/tmp
+umask 022
+
+
+4) Create directories
+
+su - root
+
+mkdir -p /u01/app/grid
+mkdir -p /u01/app/19.3.0/grid
+chown -R grid:oinstall /u01
+mkdir -p /u01/app/oracle/product/19.3.0/dbhome_1
+chown -R oracle:oinstall /u01/app/oracle
+chmod -R 775 /u01
+
+5) Configure resource limits and kernel parameters
+
+cat >> /etc/security/limits.conf <<EOF
+grid soft nproc 2047
+grid hard nproc 16384
+grid soft nofile 1024
+grid hard nofile 65536
+oracle soft nproc 2047
+oracle hard nproc 16384
+oracle soft nofile 1024
+oracle hard nofile 65536
+EOF
+
+cat >> /etc/pam.d/login <<EOF
+session    required     pam_limits.so
+EOF
+
+cat >> /etc/profile <<EOF
+if [ \$USER = "oracle" ] || [ \$USER = "grid" ]; then 
+    if [ \$SHELL = "/bin/ksh" ]; then
+        ulimit -p 16384
+        ulimit -n 65536
+    else
+        ulimit -u 16384 -n 65536
+    fi
+    umask 022
+fi
+EOF
+
+cat >> /etc/csh.login <<EOF
+if ( \$USER == "oracle" || \$USER == "grid" ) then 
+    limit maxproc 16384
+    limit descriptors 65536
+endif
+EOF
+
+cat >> /etc/sysctl.conf <<EOF
+kernel.shmmax = 4915200000
+kernel.shmall = 1200000
+#kernel.shmmax = 3221225472
+#kernel.shmall = 786432
+kernel.shmmni = 4096
+kernel.sem = 250 32000 100 128
+fs.file-max = 6815744
+net.ipv4.ip_local_port_range = 9000 65500
+net.core.rmem_default = 262144
+net.core.rmem_max = 4194304
+net.core.wmem_default = 262144
+net.core.wmem_max = 1048576
+fs.aio-max-nr = 1048576
+kernel.panic_on_oops = 1
+EOF
+
+sysctl -p
+
+6) (Optional) Configure NSLookup
+
+mv /usr/bin/nslookup /usr/bin/nslookup.original
+vi /usr/bin/nslookup
+#/bin/bash
+
+HOSTNAME=${1}
+
+if [[ $HOSTNAME = "orcl-scan" ]]; then
+    echo "Server: 8.8.8.8"
+    echo "Address: 8.8.8.8#53"
+    echo "Non-authoritative answer:"
+    echo "Name: orcl-scan"
+    echo "Address: 10.10.1.14"
+else
+    /usr/bin/nslookup.original $HOSTNAME
+fi
+
+chmod 755 /usr/bin/nslookup
+
+-- Test: 
+	nslookup orcl-scan
+
+7) Format disks & configure UDEV
+----7.1 node1-----
+fdisk -l
+fdisk /dev/sdb
+fdisk /dev/sdc
+fdisk /dev/sdd
+
+/usr/lib/udev/scsi_id -g -u -d /dev/sdb
+/usr/lib/udev/scsi_id -g -u -d /dev/sdc
+/usr/lib/udev/scsi_id -g -u -d /dev/sdd
+/usr/lib/udev/scsi_id -g -u -d /dev/sde
+/usr/lib/udev/scsi_id -g -u -d /dev/sdf
+/usr/lib/udev/scsi_id -g -u -d /dev/sdg
+
+
+1ATA_VBOX_HARDDISK_VB21791420-f0aa669b
+
+1ATA_VBOX_HARDDISK_VBde9bd1cf-68761f6c
+
+1ATA_VBOX_HARDDISK_VB14ac6fa7-db4b2bac
+
+----7.2 all node---
+vi /etc/udev/rules.d/99-oracleasm.rules
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB21791420-f0aa669b", SYMLINK+="asm-disk1", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VBde9bd1cf-68761f6c", SYMLINK+="asm-disk2", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB14ac6fa7-db4b2bac", SYMLINK+="asm-disk3", OWNER="grid", GROUP="asmadmin", MODE="0660"
+
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VBc012cf82-c8f821fe", SYMLINK+="asm-disk4", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB58d72f53-0fcdedb1", SYMLINK+="asm-disk5", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB9d0c38d7-e5279757", SYMLINK+="asm-disk6", OWNER="grid", GROUP="asmadmin", MODE="0660"
+
+udevadm control --reload-rules
+/sbin/partprobe /dev/sdb
+/sbin/partprobe /dev/sdc
+/sbin/partprobe /dev/sdd
+
+8) Disable firewall
+systemctl stop firewalld
+systemctl disable firewalld
+
+9) (Optional) Configure NTP Server
+vi /etc/chrony.conf
+
+server 10.193.74.38 iburst
+server 10.193.74.39 iburst
+server 10.193.74.40 iburst
+
+
+systemctl stop chronyd
+systemctl start chronyd
+systemctl enable chronyd
+
+10)(Optional) Configure DNS server 
+vi /etc/resolv.conf
+nameserver 8.8.8.8
