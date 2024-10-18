@@ -1,0 +1,183 @@
+data guard config
+I/ PRIMARY database
+1. turn on archive log 
+default location = db_recovery_file_dest => configure: db_recovery_file_dest and db_recovery_file_dest_size
+
+2. force login
+alter database force logging
+DML trên temporay ko sinh ra redo log
+
+3. standby redo_log (option)
+số lượng standby redo log trên RAC = node x (online redolog + số instance)
+VD: RAC 2 node, 1 instance chính -> mỗi node có 2 instance
+mỗi instance có 2 online redo log -> 2nd redo = 2 x (3+1) = 8
+khởi tạo: alter database add standby logfile '/Log_path' size 200M;
+audit: v$standby_log; v$logfile
+
+4. tnsname.ora on primary
+ORCLPROD =
+	(DESCRIPTION=
+		(ADDRESS = (PROTOCOL = TCP)(HOST = dg-primary)(PORT = 1521))
+		(CONNECT_DATA =
+			(SERVER = DEDICATED)
+			(SERVICE_NAME = orclprod)
+		)
+	)
+
+ORCLSTB =
+	(DESCRIPTION=
+		(ADDRESS = (PROTOCOL = TCP)(HOST = dg-standby)(PORT = 1521))
+		(CONNECT_DATA =
+			(SERVER = DEDICATED)
+			(SERVICE_NAME = orclstb)
+		)
+	)
+
+
+5. set parameter
+LOG_ARCHIVE_CONFIG: chỉ định các database có mặt trong cấu hình data guard (tối đa 30 DB instance)
+VD: LOG_ARCHIVE_CONFIG = 'dg_config=(orclprod,orclstb)' => cho phép orclprod và orclstb thuộc nhóm data guard này
+Cấu hình:	ALTER SYSTEM SET LOG_ARCHIVE_CONFIG='DG_CONFIG=(orcl,orclstb)';
+
+LOG_ARCHIVE_DEST_n: chỉ định đích đến cho các redo log (tối đa 31 đích đến)
+VD: LOG_ARCHIVE_DEST_2='SERVICE=orclstb
+	VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE)
+	DB_UNIQUE_NAME=orclstb ASYNC NOAFFIRM'
+	=> đích đến của redo log là database orclstb, chỉ gửi redo đi nếu database hiện tại là primary và sử dụng online redo log
+cấu hình: ALTER SYSTEM set LOG_ARCHIVE_DEST_2='SERVICE=orclstb VALID_FOR=(ONLINE_LOGFILES,PRIMARY_ROLE) DB_UNIQUE_NAME=orclstb ASYNC NOAFFIRM';
+
+LOG_ARCHIVE_DEST_STATE_n: kích hoạt trạng thái của đích đến
+cấu hình: ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2=ENABLE;
+
+6. set parameter for switch over:
+alter SYSTEM set STANDBY_FILE_MANAGER=AUTO; -> tự tạo datafile trên 2nd khi user tạo datafile trên 1st
+alter SYSTEM set FAL_SERVER=orclstb;   	# khi thiếu archive log, thì lấy dữ liệu từ đâu
+alter SYSTEM set FAL_CLIENT=orcl;		# khi có archive log bị thiếu, thì apply vào đâu
+
+7. password file (lưu thông tin của user sysdba và sysoper)
+default location: $ORACLE_HOME/dbs/orapw$INSTANCE_SID
+audit: srvctl config database -db orclprod
+tạo pw file: orapwd file=orapworclprod password=xxx => password của user sys
+* nếu passwordfile trong asm thì cần copy ra disk:
+	ASMCMD [+data/ORCL/PASSWORD] > pwcopy +data/ORCL/PASSWORD/pwdorcl.256.1182337029 /home/grid/pwfile
+	copying +data/ORCL/PASSWORD/pwdorcl.256.1182337029 -> /home/grid/pwfile/pwdorcl.256.1182337029
+
+
+II/ STANDBY database
+1. copy tnsname.ora từ primary
+
+2. listener
+tiến hành khai báo tĩnh listener
+su - grid
+$ORACLE_HOME/network/admin/listener.ora
+VD:
+SID_LIST_LISTENER = 
+  (SID_LIST = 
+    (SID_DESC =
+      (GLOBAL_DBNAME = orclstb)
+      (SID_NAME = orclstb)
+      (ORACLE_HOME = /u01/app/oracle/product/19.3.0/dbarhome_1/)
+    )
+  )
+	
+3. copy password	
+scp	 dg-primary:$ORACLE_HOME/dbs/orapworclprod 	$ORACLE_HOME/dbs
+rename passwordfile orapworclprod -> orapworclstb
+
+4. tạo directory
+mkdir -p /u01/app/oracle/admin/orclstb/adump
+mkdir -p /u01/app/oracle/fra
+
+5. tạo parameter file và startup database
+vi $ORACLE_HOME/dbs/initorclstb.ora
+
+db_name=orclprod
+db_unique_name='orclstb'
+control_files='+DATASTB/ORCLSTB/CONTROLFILE/control.ctl'
+log_archive_dest_1='location=+DATASTB'
+log_archive_config='DG-CONFIG=(orclprod,orclstb)'
+audit_file_dest='/u01/app/oracle/admin/orclstb/adump'
+fal_server=orclprod
+fal_client=orclstb
+sga_target=3008M
+pga_aggregate_target=1000M
+db_file_name_convert='+DATA','+DATASTB'		# cấu hình khi diskgroup nguồn và đích khác tên nhau
+log_file_name_convert='+DATA','+DATASTB'	# cấu hình khi diskgroup nguồn và đích khác tên nhau
+
+
+sqlplus / as sysdba
+startup nomount 
+
+III/ main config
+1. duplicate database 
+a, check connection from both server
+
+		sqlplus sys/oracle@orclprod as sysdba
+		show parameter name
+			...
+			db_name					orclprod
+			db_unique_name			orclprod
+			instance_name			orclprod
+			...
+
+		sqlplus sys/oracle@orclstb as sysdba
+		show parameter name
+			...
+			db_file_name_convert	+DATA, +DATASTB
+			db_name					orclprod
+			db_unique_name			orclstb
+			instance_name			orclstb
+			log_file_name_convert 	+DATA, +DATASTB
+			...		
+
+b, duplicate from PRIMARY
+rman target sys/oracle@orclprod auxiliary sys/oracle@orclstb
+RAMN> duplicate target database for standby from active database nofilenamecheck;
+
+2. bật redo apply on STANDBY
+alter database recover managed standby database disconnect;
+select process, status from v$managed_standby;
+MRP0		APPLYING_LOG
+
+select name, value from v$dataguard_stats;
+transport lag		+00 ...
+apply lag			+00 ...
+
+3. open STANDBY database 
+alter database recover manged standby database cancel
+alter database open
+alter database recover managed standby database disconnect
+
+4. check redo apply on PRIMARY
+select DEST_ID, DEST_NAME, status, DESTINATION, ERROR from v$archive_dest_status
+LOG_ARCHIVE_DEST_1		VALID_FOR	/u01/app/oracle/product/19.3.0/dbhome_1/dbs/arch
+LOG_ARCHIVE_DEST_2		VALID_FOR	orclstb 
+
+IV. POST CONFIG
+1. tạo set khởi động từ spfile
+	tạo spfile: create spfile='+DATASTB' from pfile; => vd: spfile được tạo ở /+data/orclstb/parameterfile/spfile.xxx
+  cập nhật pfile:
+		vi $ORACLE_HOME/dbs/initorclstb.ora
+		spfile=+data/orclstb/parameterfile/spfile.xxx
+	shutdown immediate
+	startup
+	alter database recover managed standby databse disconnect;
+
+2. recreate temp file trong trường hợp diskgroup name trên 2nd khác 1st
+aduti tempfile location: select name from v$tempfile; => Name	+DATA/ORCLPROD...
+shutdown immediate
+startup mount
+alter database rename file '+DATA/ORCLPROD...' to '+DATASTB'; 
+	
+3. cấu hình db_create_file_dest và standby_file_management
+alter system set db_create_file_dest='+DATASTB';
+alter system set standby_file_management=auto;
+
+4. add database vào server control
+check: srvctl config database -db orclstb
+... resource ... not be found
+add to server control:
+ srvctl add database -d orclstb -o $ORACLE_HOME -spfile +datastb...xxx
+restart database
+
+
