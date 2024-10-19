@@ -37,7 +37,7 @@ ORCLSTB =
 5. set parameter
 LOG_ARCHIVE_CONFIG: chỉ định các database có mặt trong cấu hình data guard (tối đa 30 DB instance)
 VD: LOG_ARCHIVE_CONFIG = 'dg_config=(orclprod,orclstb)' => cho phép orclprod và orclstb thuộc nhóm data guard này
-Cấu hình:	ALTER SYSTEM SET LOG_ARCHIVE_CONFIG='DG_CONFIG=(orcl,orclstb)';
+Cấu hình:	ALTER SYSTEM SET LOG_ARCHIVE_CONFIG='DG_CONFIG=(orclprod,orclstb)';
 
 LOG_ARCHIVE_DEST_n: chỉ định đích đến cho các redo log (tối đa 31 đích đến)
 VD: LOG_ARCHIVE_DEST_2='SERVICE=orclstb
@@ -50,7 +50,7 @@ LOG_ARCHIVE_DEST_STATE_n: kích hoạt trạng thái của đích đến
 cấu hình: ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2=ENABLE;
 
 6. set parameter for switch over:
-alter SYSTEM set STANDBY_FILE_MANAGER=AUTO; -> tự tạo datafile trên 2nd khi user tạo datafile trên 1st
+alter SYSTEM set STANDBY_FILE_MANAGEMENT=AUTO; -> tự tạo datafile trên 2nd khi user tạo datafile trên 1st
 alter SYSTEM set FAL_SERVER=orclstb;   	# khi thiếu archive log, thì lấy dữ liệu từ đâu
 alter SYSTEM set FAL_CLIENT=orcl;		# khi có archive log bị thiếu, thì apply vào đâu
 
