@@ -52,7 +52,7 @@ cấu hình: ALTER SYSTEM SET LOG_ARCHIVE_DEST_STATE_2=ENABLE;
 6. set parameter for switch over:
 alter SYSTEM set STANDBY_FILE_MANAGEMENT=AUTO; -> tự tạo datafile trên 2nd khi user tạo datafile trên 1st
 alter SYSTEM set FAL_SERVER=orclstb;   	# khi thiếu archive log, thì lấy dữ liệu từ đâu
-alter SYSTEM set FAL_CLIENT=orcl;		# khi có archive log bị thiếu, thì apply vào đâu
+alter SYSTEM set FAL_CLIENT=orclprod;		# khi có archive log bị thiếu, thì apply vào đâu
 
 7. password file (lưu thông tin của user sysdba và sysoper)
 default location: $ORACLE_HOME/dbs/orapw$INSTANCE_SID
@@ -76,7 +76,7 @@ SID_LIST_LISTENER =
     (SID_DESC =
       (GLOBAL_DBNAME = orclstb)
       (SID_NAME = orclstb)
-      (ORACLE_HOME = /u01/app/oracle/product/19.3.0/dbarhome_1/)
+      (ORACLE_HOME = /u01/app/oracle/product/19.3.0/dbhome_1/)
     )
   )
 	
@@ -84,7 +84,7 @@ SID_LIST_LISTENER =
 scp	 dg-primary:$ORACLE_HOME/dbs/orapworclprod 	$ORACLE_HOME/dbs
 rename passwordfile orapworclprod -> orapworclstb
 
-4. tạo directory
+4. tạo directory bằng user oracle
 mkdir -p /u01/app/oracle/admin/orclstb/adump
 mkdir -p /u01/app/oracle/fra
 
@@ -95,7 +95,7 @@ db_name=orclprod
 db_unique_name='orclstb'
 control_files='+DATASTB/ORCLSTB/CONTROLFILE/control.ctl'
 log_archive_dest_1='location=+DATASTB'
-log_archive_config='DG-CONFIG=(orclprod,orclstb)'
+log_archive_config='DG_CONFIG=(orclprod,orclstb)'
 audit_file_dest='/u01/app/oracle/admin/orclstb/adump'
 fal_server=orclprod
 fal_client=orclstb
