@@ -62,7 +62,7 @@ alter SYSTEM set FAL_CLIENT=orclprod;    # khi có archive log bị thiếu, th�
 7. password file (lưu thông tin của user sysdba và sysoper)
 default location: $ORACLE_HOME/dbs/orapw$INSTANCE_SID
 audit: srvctl config database -db orclprod
-tạo pw file: orapwd file=orapworclprod password=xxx => password của user sys
+tạo pw file: orapwd file=orapworclprod password=xxx format=12 => password của user sys theo chuẩn 12 (password đơn giản)
 * nếu passwordfile trong asm thì cần copy ra disk:
 	ASMCMD [+data/ORCL/PASSWORD] > pwcopy +data/ORCL/PASSWORD/pwdorcl.256.1182337029 /home/grid/pwfile
 	copying +data/ORCL/PASSWORD/pwdorcl.256.1182337029 -> /home/grid/pwfile/pwdorcl.256.1182337029
