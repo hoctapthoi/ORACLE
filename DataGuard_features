@@ -1,0 +1,4 @@
+----1. enable DML Direction------
+bật tính năng DML Direction trên cả 2 node:
+SQL> alter system set adg_redirect_dml=true;
+tạo bảng trên primary node
