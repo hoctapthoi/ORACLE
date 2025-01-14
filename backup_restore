@@ -1,0 +1,16 @@
+-------------- A. backup -------------
+type:
+  backup full
+  backup level 0: RMAN> backup incremental level 0 database;
+  backup level 1:
+    diffrencial: backup phần thay đổi từ level 1/0 gần nhất : RMAN> backup incremental level 1 database;
+    cumulative: backup phần thay đổi từ level 0 gần nhất    : RMAN> backup incremental level 1 cumulative database;
+
+backup option:
+  backup manual sử dụng RUN:
+    RMAN> run
+    {
+    	allocate chanel rman_1 device type disk;
+    	allocate chanel rman_2 device type disk;
+    	backup incremental level 1 database;
+    }	
