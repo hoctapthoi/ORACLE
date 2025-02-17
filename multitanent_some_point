@@ -53,3 +53,8 @@ khởi động:
 		SQL> select con_name, state from cdb_pdb_saved_states;
 	xóa saved state:
 		SQL> alter pluggable database pdb2 discard state;
+
+kiểm tra thuộc tính của PDB:
+	connect pdb,		SQL> select property_name, property_value from database_properties;
+	connect cdb,		SQL> select property_name, property_value con_id from cdb_properties;
+	
