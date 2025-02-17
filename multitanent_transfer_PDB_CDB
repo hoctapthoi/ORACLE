@@ -1,4 +1,3 @@
-
 ----------Clone pluggable khác CDB dùng database link:
 ---- clone pdb2 từ cdb sang testcdb
 -- kiểm tra đường dẫn datafile, tempfile của PDB2
