@@ -1,0 +1,151 @@
+
+----------Clone pluggable khác CDB dùng database link:
+---- clone pdb2 từ cdb sang testcdb
+-- kiểm tra đường dẫn datafile, tempfile của PDB2
+SQL> select file_name from dba_data_files;
+SQL> select file_name from dba_temp_files;
+
+-- kiểm tra local undo đã enable hay chưa
+SQL> alter session set container=cdb$root;
+SQL> select property_name, property_value from database_properties where property_name like '%LOCAL_UNDO%';
+
+--tạo user để clone pluggable
+SQL> alter session set container=pdb2;
+SQL> create user migrate_user identified by oracle;
+SQL> grant connect, create pluggable database to migrate_user;
+
+-- create database link trên testcdb
+$ export ORACLE_SID=testcdb
+SQL> create database link migrate_link connect to migrate_user identifiedby oracle using 'pdb2';
+
+-- kiểm tra database link:
+SQL>  select sysdate from dual@migrate_link;
+
+-- clone thư mục chứa dữ liệu
+$ cd /u01/app/oracle/oradata/TESTCDB
+$ mkdir pdb2
+$ cd pdb2
+
+-- tạo pluggable 
+--------  đã bật OMF
+SQL> create pluggable database pdb2 from pdb2@migrate_link
+
+--------  chưa bật OMF thì phải sử dụng file_name_convert)
+SQL> create pluggable database pdb2 from pdb2@migrate_link file_name_convert=(
+'+DATA/ORCLCDB/KUHDFUIOH09812UIHJK/DATAFILE/',
+'/u01/app/oracle/oradata/TESTCDB/pdb2/',
+'+DATA/ORCLCDB/KUHDFUIOH09812UIHJK/TEMPFILE/',
+'/u01/app/oracle/oradata/TESTCDB/pdb2/');
+
+-- kiểm tra
+SQL> alter pluggable database pdb2 open;
+SQL> select file_name from dba_data_files;
+SQL> select file_name from dba_temp_files;
+
+----------Clone pluggable cùng CDB (pdb2 -> pdb2new 
+-- kiểm tra đường dẫn datafile, tempfile của PDB2
+-- kiểm tra local undo đã enable hay chưa
+-- clone thư mục chứa dữ liệu
+-- tạo pluggable (nếu không bật OMF thì phải sử dụng file_name_convert)
+SQL> create pluggable database pdb2new from pdb2 file_name_convert=(
+'+DATA/ORCLCDB/KUHDFUIOH09812UIHJK/DATAFILE/',
+'/u01/app/oracle/oradata/TESTCDB/pdb2new/',
+'+DATA/ORCLCDB/KUHDFUIOH09812UIHJK/TEMPFILE/',
+'/u01/app/oracle/oradata/TESTCDB/pdb2new/');
+
+--------------di chuyển pdb1 từ orclcdb to testcdb
+-- kiểm tra đường dẫn datafile, tempfile của PDB2
+-- backup database
+RMAN> backup pluggable database pdb1;
+
+-- đóng và unplug và drop database (nhưng vẫn giữ datafile)
+SQL> alter pluggable database pdb1 close immediate;
+SQL> alter pluggable database pdb1 unplug into '/home/oracle/pdb1.xml';
+SQL> select pdb_name, status from cdb_pdbs;
+SQL> drop pluggable database pdb1 keep datafiles;
+
+-- kết nối đến testcdb
+SQL> export ORACLE_SID=testcdb
+SQL> select pdb_name, status from cdb_pdbs
+
+-- kiểm tra tính tương thích của pdb1 với testcdb
+SQL> set serveroutput on
+SQL> declare
+res varchar2(10 := case dbms_pdb.check_plug_compatibility (PDB_DESCR_FILE => '/home/oracle/pdb1.xml', pdb_name=> 'pdb1') 
+when true then 'YES' else 'NO' end;
+begin
+	dbms_output.put_line(res);
+end;
+/
+
+-- move db file từ nguồn (ASM) sang đích (FS). nếu nguồn là ASM và đích là filesystem thì chú ý: 
+-- tên file trên ASM viết hoa, trên FS viết thường, nên cần convert lại tên,
+-- owner của file trên ASM là grid, trên FS là oracle
+-- plug pdb1 vào testcdb
+SQL> create pluggable database pdb1 using '/home/oracle/pdb1.xml' source_file_name_convert=(
+'+DATA/ORACLECDB/FO1I2UJ3OIJ123NJM/DATAFILE/'
+'/u01/app/oracle/oradata/TESTCDB/pdb1',
+'+DATA/ORACLECDB/FO1I2UJ3OIJ123NJM/TEMPFILE/'
+'/u01/app/oracle/oradata/TESTCDB/pdb1') nocopy;
+SQL> show pdbs
+SQL> alter pluggable database pdb1 open;
+
+-------move non-CDB (orcl) into CDB (orclcdb) bằng dbms_pdb
+-- shutdown chuyển DB orcl về open read only
+SQL> shutdown immediate
+SQL> startup mount
+SQL> alter database open read only;
+
+-- tạo file xml mô tả kiến trúc DB
+SQL> exec dbms_pdb.describle(pdb_descr_file=> '/home/oracle/orcl.xml')
+
+-- kiểm tra tính tương thích xml trên orclcdb
+SQL> declare
+res varchar2(10 := case dbms_pdb.check_plug_compatibility (PDB_DESCR_FILE => '/home/oracle/orcl.xml', pdb_name=> 'orclcdb) 
+when true then 'YES' else 'NO' end;
+begin
+	dbms_output.put_line(res);
+end;
+
+-- shutdown orcl
+SQL> shutdown immediate
+
+-- kết nối CDB orclcdb, tạo pdb từ file xml
+SQL> create pluggable database orclpdb using '/home/oracle/orcl.xml'; 
+
+-- kiểm tra trạng thái
+SQL> select pdb_name, status from cdb_pdbs;
+
+-- convert orclpdb chính thức thành 1 pdb
+SQL> alter session set container=orclpdb;
+SQL> @$ORACLE_HOME/rdbms/admin/noncdb_to_pdb.sql
+SQL> alter pluggable database orclpdb open;
+
+-------move non-CDB orcl into CDB orclcdb bằng database link
+-- tạo file xml mô tả kiến trúc DB
+-- kiểm tra tính tương thích
+-- tạo user trên orcl
+SQL> create user migrate_user identified by oracle;
+SQL> grant connect, create pluggable database to migrate_user;
+
+-- kiểm tra đường dẫn orcl
+SQL> select file_name from dba_data_files;
+SQL> select file_name from dba_temp_files;
+
+-- tạo db link trên orclcdb
+SQL> create database link migrate_link connect to migrate_user identified by oracle using 'orcl';
+SQL> select sysdate from dual@migrate_link;
+
+-- tạo pluggable database
+SQL> create pluggable database orclpdb from orcl@migrate_link file_name_convert
+'/u01/app/oracle/oradata/ORCL/',
+'+DATA/ORACLECDB/ORCLPDB/');
+
+-- convert
+SQL> alter session set container=orclpdb;
+SQL> @$ORACLE_HOME/rdbms/admin/noncdb_to_pdb
+
+-- open orclpdb
+SQL> alter session set container=cdb$root;
+SQL> alter pluggable database orclpdb open;
+SQL> show pdbs;
