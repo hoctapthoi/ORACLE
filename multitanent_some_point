@@ -1,0 +1,55 @@
+	kiểm tra mode của các pdb
+		SQL> show pdbs 
+			CON_ID 	CON_NAME					OPEN MODE  RESTRICTED
+		---------- 	------------------------ 	---------- ----------
+			 2 		PDB$SEED 					READ ONLY  NO
+			 3 		PDB1  	 					READ WRITE NO
+			 
+	pdb_file_name_convert gồm 2 tham số: 
+		đường dẫn datafile của pdb$seed
+		đường dẫn datafile của pdbs
+	kiểm tra trạng thái của tham số pdb_file_name_convert	
+		SQL> show parameter pdb_file
+		NAME					TYPE		VALUE
+		---------------------	-----------	-------
+		pdb_file_name_convert	string
+	
+	kiểm tra đường dẫn datafile của pdb$seed
+		SQL> alter session set container=pdb$seed;
+		SQL> select file_name from dba_data_files;
+		FILE_NAME
+		----------------------------------
+		/u02/oradata/orclcdb/pdbseed/system01.dbf
+		/u02/oradata/orclcdb/pdbseed/sysaux01.dbf
+		
+	set tham số pdf_file_name_convert
+		SQL> alter session set container=pdb$root
+		SQL> alter system set pdb_file_name_convert='/u02/oradata/orclcdb/pdbseed/','/u02/oradata/orclcdb/pdb2/';
+		SQL> show parameter pdb_file 
+		NAME					TYPE		VALUE
+		---------------------	-----------	--------------------------------
+		pdb_file_name_convert	string		/u02/oradata/orclcdb/pdbseed/,
+											/u02/oradata/orclcdb/pdb2/
+		
+	tạo pdb mới (pdb2)
+		SQL> create pluggable database pdb2 admin user tunglt identified by oracle roles=(connect);
+
+	open db
+		SQL> alter pluggable database pdb2 open;
+		
+	kiểm tra
+		SQL> show dbs
+		
+kết nối PDB
+	kết nối đến CDB$root, sau đó switch sang (câu lệnh alter session set container=pdb2)
+	khai báo tns name và kết nối trực tiếp vào pdb2
+
+khởi động:
+	mặt định, sau khi khởi động, oracle sẽ chỉ open root container (PDB$root), các pluggable container chỉ nằm ở trạng thái mount
+	đổi mặt định mount sang open của pluggable database: 
+		SQL> alter pluggable database pdb2 open;
+		SQL> alter pluggable database pdb2 save state;
+	kiểm tra những pdb nào đã được lưu state:
+		SQL> select con_name, state from cdb_pdb_saved_states;
+	xóa saved state:
+		SQL> alter pluggable database pdb2 discard state;
