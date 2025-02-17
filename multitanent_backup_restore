@@ -1,0 +1,154 @@
+---B. backup
+-- level 0 ---
+RMAN> backup incremental level 0 database;
+
+-- level 1 difrencial ---
+RMAN> backup incremental level 1 database;
+
+-- level 1 cumulative ---
+RMAN> backup incremental level 1 cumulative database;
+
+-- manual backup multi chanel---
+RMAN> run
+{
+	allocate chanel rman_1 device type disk;
+	allocate chanel rman_1 device type disk;
+	backup incremental level 1 database;
+}	
+
+-- backup with compress
+backup as compressed backupset incremental level 1 database;
+
+
+-- check ---
+RMAN> list backup summary;
+RMAN> list backup of database;
+
+----------recovery-----------
+1. loss control file, còn 1 control file khác ở /u01/data/controlfile02.ctl
+SQL> shutdown abort
+SQL> startup nomount 
+RMAN> restore controlfile from '/u01/data/controlfile02.ctl';
+SQL> alter database mount;
+SQL> alter database open;
+
+2. loss root container datafile
+hiện trạng: khi checkpoint database sẽ bị shutdown
+SQL> startup mount
+
+-- tìm datafile bị mất
+SQL> select file#, name, error from v$datafile_header; -->ERROR = FILE NOT FOUND (ex: file# = 24)
+RMAN> list backup summary;
+RMAN> list backup of datafile 24;
+
+--kiểm tra backup cho datafile 24;
+RMAN> restore datafile 24 preview;
+
+--thực hiện restore  cho datafile 24;
+RMAN> restore datafile 24;
+RMAN> recover datafile 24;
+
+-- mở database;
+SQL> alter database open;
+
+3. PITR cho container database 
+-- kiểm tra thời gian
+select to_char(sysdate, 'ddmmyyyy hh24:mi:ss') from dual; (ex: deleted time = 05022025 15:26:59)
+-- kiểm tra backup
+RMAN> run
+		{
+			set until time "to_date('05022025 15:26:59','ddmmyyyy hh24:mi:ss');
+			restore database preview;
+		}
+
+-- kiểm tra archive log nào đang chứa thời gian cần recovery		
+SQL> select sequence#, to_char(FIRST_TIME,'ddmmyyyy hh24:mi:ss'), to_char(NEXT_TIME,'ddmmyyyy hh24:mi:ss') from v$archived_log;	(ex: sequence# = 26)
+
+-- kiểm tra thông tin archive file
+RMAN> list archivelog sequence 26;	
+
+-- thực hiện restore, recover:
+SQL> shutdown immediate;
+SQL> startup mount;
+RMAN> run
+		{
+			set until time "to_date('05022025 15:26:59','ddmmyyyy hh24:mi:ss');
+			restore database;
+			recover databse;
+		}
+SQL> alter database open resetlogs;
+
+4. PITR cho pluggable database
+thực hiện kiểm tra như container database
+-- thực hiện đóng pluggable database trước khi thực hiện recovery;
+SQL> alter pluggable database pdb2 close immediate;
+
+-- thực hiện restore, recover:
+RMAN> run
+		{
+			set until time "to_date('05022025 15:26:59','ddmmyyyy hh24:mi:ss');
+			restore pluggable database pdb2;
+			recover pluggable database pdb2;
+		}
+RMAN> alter pluggable database pdb2 open resetlogs;
+
+5. recovery lossing datafile by Recovery Advisor
+RMAN> list failure;
+RMAN> list failure detail;
+RMAN> advise failure all;
+RMAN> repair failure;
+
+---C. DataPump
+
+1. PDB2 to PDB2TEST trên cùng 1 CDB
+-- kiểm tra user, tablespace trên PDB2
+-- tạo thư mục chứ file dump trên source
+$ mkdir -p /u01/app/oracle/pump
+
+-- create directory
+SQL> create directory test_export as '/u01/app/oracle/pump';
+
+-- expdp
+$ expdp "'sys@pdb2 as sysdba'" directory=test_export dumpfile=pdb2_%U.dmp logfile=pdb2_exp.log full=y compress=all parallel=2
+
+-- kiểm tra file dump
+$ ll /u01/app/oracle/pump
+
+
+-- tạo database pdb2test từ pdb$seed
+SQL> create pluggable database pdb2test admin user duy identified by oracle role=(connect) file_name_convert=('/u01/oradata/orclcdb/pdbseed/','/u01/oradata/orclcdb/pdbseed/pdb2test');
+
+--open pluggable database
+SQL> alter pluggable database pdb2test open;
+
+-- tạo user từ root container
+SQL> create user c##duydx identified by oracle;
+
+-- kết nối đến pdb2test
+SQL> alter session set=pdb2test;
+
+-- cấp quyền user
+SQL> alter user c##duydx quota unlimited on system;
+SQL> grant connect to c##duydx;
+
+-- tạo tbs giống tbs nguồn
+SQL> create tablespace user datafile '/u01/oradata/orclcdb/pdbseed/pdb2test/user_001.dbf' size 100M autoextend on next 10M maxsize unlimited;
+
+-- tạo directory trỏ vào thư mục export
+SQL> create directory test_import as '/u01/app/oracle/pump';
+
+-- tạo tnsname để kết nối tới pdb2test
+$ impdp "'sys@pdb2test as sysdba'" directory=test_import dumpfile=pdb2_%U.dmp logfile=pdb2test_imp.log full=y parallel=2
+
+2. Non-CDB (orcl) to CDB (orcldb)
+-- orcl: kiểm tra user datafile
+SQL> select file_name from dba_data_files;
+
+-- orcl: kiểm tra 1 table của 1 user
+
+-- tạo 1 directory cho export
+SQL> create directory testpump as '/u01/app/oracle/pump/';
+
+-- export
+$ expdp "'/ as sysdba'" directy=testpump dumpfile=db_full_%U.dmp logfile=db_full.log parallel=2 full=y compress=all
+...
