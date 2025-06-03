@@ -70,7 +70,7 @@ SQL> select pdb_name, status from cdb_pdbs
 -- kiểm tra tính tương thích của pdb1 với testcdb
 SQL> set serveroutput on
 SQL> declare
-res varchar2(10 := case dbms_pdb.check_plug_compatibility (PDB_DESCR_FILE => '/home/oracle/pdb1.xml', pdb_name=> 'pdb1') 
+res varchar2(10) := case dbms_pdb.check_plug_compatibility (PDB_DESCR_FILE => '/home/oracle/pdb1.xml', pdb_name=> 'pdb1') 
 when true then 'YES' else 'NO' end;
 begin
 	dbms_output.put_line(res);
