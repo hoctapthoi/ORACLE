@@ -1,0 +1,32 @@
+---- 1. install package -----
+[oracle@ora19 ~]$ curl https://packages.microsoft.com/rhel/7/prod/Packages/m/msodbcsql17-17.0.1.1-1.x86_64.rpm
+[oracle@ora19 ~]$ curl https://packages.microsoft.com/config/rhel/7/packages-microsoft-prod.rpm
+[oracle@ora19 ~]$ mount /dev/cdrom /mnt
+[oracle@ora19 ~]$ rpm -ivh msodbcsql17-17.0.1.1-1.x86_64.rpm packages-microsoft-prod.rpm
+[oracle@ora19 ~]$ yum install -y unixODBC
+
+----- 2. configure file
+[oracle@ora19 ~]$ cat /etc/odbcinst.ini
+...
+[ODBC Driver 17 for SQL Server]
+Description=Microsoft ODBC Driver 17 for SQL Server
+Driver=/opt/microsoft/msodbcsql17/lib64/libmsodbcsql-17.0.so.1.1
+UsageCount=1
+
+[oracle@ora19 ~]$ cat /etc/odbc.ini
+[SQLServerODBC]
+Driver = ODBC Driver 17 for SQL Server
+Server = 192.168.157.1
+Database = master
+
+[oracle@ora19 ~]$ isql -v SQLServerODBC sa 123
++---------------------------------------+
+| Connected!                            |
+|                                       |
+| sql-statement                         |
+| help [tablename]                      |
+| quit                                  |
+|                                       |
++---------------------------------------+
+
+  
