@@ -1,0 +1,28 @@
+--- ước lượng dụng lượng database theo SCN -----
+SELECT SEQUENCE#, FIRST_TIME, NEXT_TIME, BLOCKS * BLOCK_SIZE AS SIZE_BYTES
+FROM V$ARCHIVED_LOG
+WHERE FIRST_CHANGE# >= :standby_scn AND NEXT_CHANGE# <= :primary_scn;
+
+SELECT SUM(BLOCKS * BLOCK_SIZE) AS approx_bytes
+FROM V$ARCHIVED_LOG
+WHERE FIRST_CHANGE# >= :standby_scn AND NEXT_CHANGE# <= :primary_scn;
+
+------ khởi động quá trình apply archive log (MRP) ------
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE;
+
+------ chạy MRP để apply cho đến khi nhất quán, sau đó, quá trình apply log sẽ dùng -----
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE UNTIL CONSISTENT;
+
+------ chạy MRP ở background ------
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT FROM SESSION;
+
+------- chạy MRP apply redo real-time thay vì chỉ apply archive log -----
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE;
+
+------- chạy MRP ở background để apply redo real-time thay vì chỉ apply archive log -----
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE DISCONNECT FROM SESSION;
+
+-------- pause MRP ---
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE DISCONNECT;
+-------- Cancel MRP (force stop) ---
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL;
