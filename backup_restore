@@ -14,3 +14,17 @@ backup option:
     	allocate chanel rman_2 device type disk;
     	backup incremental level 1 database;
     }	
+
+kiểm tra backup:
+	LIST BACKUP OF DATABASE
+
+kiểm tra backup xem có thể restore hay không:
+	RECOVER DATABASE UNTIL TIME '2025-07-20 23:59:59' VALIDATE;
+
+tiến hành restore:
+	RUN
+		{
+			SET UNTIL TIME "TO_DATE('2025-07-20 23:59:59', 'YYYY-MM-DD HH24:MI:SS')";
+			RESTORE DATABASE;
+			RECOVER DATABASE;
+		}
