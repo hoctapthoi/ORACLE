@@ -1,0 +1,31 @@
+======== Grid ===========
+---- check resource status
+crsctl stat res -t
+
+---- check overview cluster service status
+crsctl check crs
+
+---- start/stop cluster
+crsctl start/stop crs
+
+----- add/delete node_name to/of cluster
+crsctl add/delete node -n <node_name>
+
+------ check software version 
+crsctl query crs softwareversion -all
+
+------ check vote disk status
+crsctl query css votedisk
+
+======== RAC ============
+---- start/stop/check instance ORCL1 of cluster instance ORCL 
+srvctl start/stop/status instance -db ORCL -i ORCL1
+
+---- start/stop/check cluster instance on both node
+srvctl start/stop/status database -db ORCL
+
+---- check configure cluster/instance/scan
+srvctl config database/listener/scan -db orcl
+
+---- start/stop/check listener
+srvctl start/stop/status listener -l listener -n node1
