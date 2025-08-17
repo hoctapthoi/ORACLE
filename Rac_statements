@@ -7,6 +7,7 @@ crsctl check crs
 
 ---- start/stop cluster
 crsctl start/stop crs
+crsctl stop cluster -all
 
 ----- add/delete node_name to/of cluster
 crsctl add/delete node -n <node_name>
