@@ -1,0 +1,154 @@
+#### #new for OL8
+# both node1, node2
+mount /dev/cdrom /mnt
+cd /etc/yum.repos.d/
+mkdir bak
+mv *.repo bak
+vi local.repo
+
+[local1]
+enabled=1
+gpgcheck=0
+baseurl=file:///mnt/BaseOS
+
+[local2]
+enabled=1
+gpgcheck=0
+baseurl=file:///mnt/AppStream
+
+yum search preinstall
+
+yum install -y oracle-database-preinstall-21c.x86_64 net-tools telnet
+
+vi /etc/hosts
+
+# Public
+192.168.56.121 node1.localdomain node1
+192.168.56.122 node2.localdomain node2
+192.168.56.200 ntp.localdomain ntp
+
+# Private
+192.168.159.121 node1-priv.localdomain node1-priv
+192.168.159.122 node2-priv.localdomain node2-priv
+
+# Virtual
+192.168.56.131 node1-vip.localdomain node1-vip
+192.168.56.132 node2-vip.localdomain node2-vip
+
+# SCAN
+192.168.56.141 node-scan.localdomain node-scan
+192.168.56.142 node-scan.localdomain node-scan
+192.168.56.143 node-scan.localdomain node-scan
+
+groupadd -g 54327 asmdba
+groupadd -g 54328 asmoper
+groupadd -g 54329 asmadmin
+useradd -u 54322 -g oinstall -G dba,oper,asmdba,asmoper,asmadmin,racdba grid
+usermod -G asmdba,asmoper,asmadmin oracle
+passwd grid
+
+passwd oracle
+
+yum install -y kmod-redhat-oracleasm.x86_64
+
+systemctl stop firewalld
+systemctl disable firewalld
+
+setenforce 0
+vi /etc/selinux/config
+
+mkdir -p /u01/app/19c/grid
+mkdir -p /u01/app/grid
+mkdir -p /u01/app/oracle/product/19c/db_1
+chown -R grid:oinstall /u01
+chown oracle:oinstall /u01/app/oracle
+chmod -R 775 /u01/
+
+su - oracle
+export TMP=/tmp
+export TMPDIR=$TMP
+export ORACLE_BASE=/u01/app/oracle
+#export GRID_HOME=/u01/app/19c/grid
+export DB_HOME=$ORACLE_BASE/product/19c/db_1
+export ORACLE_HOME=$DB_HOME
+export ORACLE_SID=orcl1
+export ORACLE_TERM=xterm
+#export BASE_PATH=/usr/sbin:$PATH
+export PATH=$ORACLE_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
+export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+umask 022
+
+su - grid
+export ORACLE_SID=+ASM1
+export ORACLE_HOME=/u01/app/19c/grid
+export ORACLE_BASE=/u01/app/grid
+export PATH=$ORACLE_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
+export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+umask 022
+
+vi /etc/security/limits.conf
+oracle soft nofile 131072
+oracle hard nofile 131072
+oracle soft nproc 131072
+oracle hard nproc 131072
+oracle soft core unlimited
+oracle hard core unlimited
+oracle soft memlock 3500000
+oracle hard memlock 3500000
+grid soft nofile 131072
+grid hard nofile 131072
+grid soft nproc 131072
+grid hard nproc 131072
+grid soft core unlimited
+grid hard core unlimited
+grid soft memlock 3500000
+grid hard memlock 3500000
+
+oracleasm configure -i
+oracleasm init
+
+# node1:
+Copy and unzip grid setup to $ORACLE_HOME
+fdisk /dev/sdb
+...
+lsblk -f
+
+#node2:
+partprobe
+lsblk -f
+
+#node1:
+oracleasm createdisk DATA01 /dev/sdb1
+oracleasm createdisk DATA02 /dev/sdc1
+
+oracleasm createdisk OCR01 /dev/sdd1
+oracleasm createdisk OCR02 /dev/sde1
+oracleasm createdisk OCR03 /dev/sdf1
+
+oracleasm scandisks
+oracleasm listdisks
+
+#ls -ltr /dev/oracleasm/disks
+
+#node2:
+oracleasm scandisks
+oracleasm listdisks
+
+
+#node1:
+cd /u01/app/19c/grid/deinstall
+./sshUserSetup.sh -user grid -hosts "node1 node2" -noPromptPassphrase -confirm -advanced
+
+mkdir -p /u01/app/oraInventory
+cd $ORACLE_HOME
+export CV_ASSUME_DISTID=OEL8
+sudo chown -R grid:oinstall .
+./gridSetup.sh
+
+#node1,2:
+cd /u01/app/19c/grid/cv/rpm
+rpm -Uvh cvuqdisk-1.0.10-1.rpm
+
+
