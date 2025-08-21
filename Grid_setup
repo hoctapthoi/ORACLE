@@ -1,11 +1,12 @@
-#### #new for OL8
-# both node1, node2
+
+#####Grid installation on OEL8
+#new
 mount /dev/cdrom /mnt
 cd /etc/yum.repos.d/
 mkdir bak
 mv *.repo bak
-vi local.repo
 
+sudo tee /etc/yum.repos.d/local.repo > /dev/null <<'EOF'
 [local1]
 enabled=1
 gpgcheck=0
@@ -15,13 +16,12 @@ baseurl=file:///mnt/BaseOS
 enabled=1
 gpgcheck=0
 baseurl=file:///mnt/AppStream
+EOF
 
-yum search preinstall
+yum install -y oracle-database-preinstall* oracleasm* net-tools telnet
 
-yum install -y oracle-database-preinstall-21c.x86_64 net-tools telnet
 
-vi /etc/hosts
-
+sudo tee -a /etc/hosts > /dev/null <<'EOF'
 # Public
 192.168.56.121 node1.localdomain node1
 192.168.56.122 node2.localdomain node2
@@ -39,23 +39,25 @@ vi /etc/hosts
 192.168.56.141 node-scan.localdomain node-scan
 192.168.56.142 node-scan.localdomain node-scan
 192.168.56.143 node-scan.localdomain node-scan
+EOF
 
 groupadd -g 54327 asmdba
 groupadd -g 54328 asmoper
 groupadd -g 54329 asmadmin
 useradd -u 54322 -g oinstall -G dba,oper,asmdba,asmoper,asmadmin,racdba grid
 usermod -G asmdba,asmoper,asmadmin oracle
-passwd grid
+echo "123" | sudo passwd --stdin grid
 
-passwd oracle
+echo "123" | sudo passwd --stdin oracle
 
-yum install -y kmod-redhat-oracleasm.x86_64
+#yum install -y kmod-redhat-oracleasm.x86_64
 
 systemctl stop firewalld
 systemctl disable firewalld
 
 setenforce 0
-vi /etc/selinux/config
+sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
+
 
 mkdir -p /u01/app/19c/grid
 mkdir -p /u01/app/grid
@@ -64,31 +66,101 @@ chown -R grid:oinstall /u01
 chown oracle:oinstall /u01/app/oracle
 chmod -R 775 /u01/
 
-su - oracle
+sudo tee -a /home/oracle/.bash_profile > /dev/null <<'EOF'
 export TMP=/tmp
 export TMPDIR=$TMP
 export ORACLE_BASE=/u01/app/oracle
 #export GRID_HOME=/u01/app/19c/grid
 export DB_HOME=$ORACLE_BASE/product/19c/db_1
 export ORACLE_HOME=$DB_HOME
-export ORACLE_SID=orcl1
+export ORACLE_SID=orcl
 export ORACLE_TERM=xterm
 #export BASE_PATH=/usr/sbin:$PATH
 export PATH=$ORACLE_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
 export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
 umask 022
+EOF
 
-su - grid
+sudo tee -a /home/oracle/.bashrc > /dev/null <<'EOF'
+alias ss='sqlplus / as sysdba'
+EOF
+sudo tee -a /home/grid/.bashrc > /dev/null <<'EOF'
+alias ss='sqlplus / as sysasm'
+EOF
+
+sudo tee -a /home/grid/.bash_profile > /dev/null <<'EOF'
 export ORACLE_SID=+ASM1
 export ORACLE_HOME=/u01/app/19c/grid
-export ORACLE_BASE=/u01/app/grid
 export PATH=$ORACLE_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
 export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
 umask 022
+EOF
+chmod u+x /home/grid/.bash_profile
+chmod u+x /home/oracle/.bash_profile
+chmod u+x /home/grid/.bashrc
+chmod u+x /home/oracle/.bashrc
 
-vi /etc/security/limits.conf
+mv /etc/profile /etc/profile.bak
+tee /etc/profile > /dev/null <<'EOF'
+#profile
+# /etc/profile
+# System wide environment and startup programs, for login setup
+# Functions and aliases go in /etc/bashrc
+pathmunge () {
+      if ! echo $PATH | /bin/egrep -q "(^|:)$1($|:)" ; then
+            if [ "$2" = "after" ] ; then
+                  PATH=$PATH:$1
+            else
+                  PATH=$1:$PATH
+            fi
+      fi
+}
+# ksh workaround
+if [ -z "$EUID" -a -x /usr/bin/id ]; then
+      EUID=`id -u`
+      UID=`id -ru`
+fi
+# Path manipulation
+if [ "$EUID" = "0" ]; then
+pathmunge /sbin
+pathmunge /usr/sbin
+pathmunge /usr/local/sbin
+fi
+# No core files by default
+ulimit -S -c 0 > /dev/null 2>&1
+if [ -x /usr/bin/id ]; then
+      USER="`id -un`"
+      LOGNAME=$USER
+      MAIL="/var/spool/mail/$USER"
+fi
+HOSTNAME=`/bin/hostname`
+HISTSIZE=1000
+if [ -z "$INPUTRC" -a ! -f "$HOME/.inputrc" ]; then
+      INPUTRC=/etc/inputrc
+fi
+export PATH USER LOGNAME MAIL HOSTNAME HISTSIZE INPUTRC
+for i in /etc/profile.d/*.sh ; do
+      if [ -r "$i" ]; then
+            . $i
+      fi
+done
+if [ $USER = "oracle" ] || [ $USER = "grid" ]; then
+      umask 022
+      if [ $SHELL = "/bin/ksh" ]; then
+            ulimit -p 16384
+            ulimit -n 65536
+      else
+            ulimit -u 16384 -n 65536
+      fi
+fi
+unset i
+unset pathmunge
+EOF
+
+cp /etc/security/limits.conf /etc/security/limits.conf.bak
+tee -a /etc/security/limits.conf > /dev/null <<'EOF'
 oracle soft nofile 131072
 oracle hard nofile 131072
 oracle soft nproc 131072
@@ -105,12 +177,21 @@ grid soft core unlimited
 grid hard core unlimited
 grid soft memlock 3500000
 grid hard memlock 3500000
+# Recommended stack hard limit 32MB for oracle installations
+# oracle hard stack 32768
+EOF
+
+##copy and unzip  grid.zip on node1
+cd /u01/app/19c/grid/deinstall
+./sshUserSetup.sh -user grid -hosts "node1 node2" -noPromptPassphrase -confirm -advanced
+
+cd /u01/app/19c/grid/cv/rpm
+rpm -Uvh cvuqdisk-1.0.10-1.rpm
 
 oracleasm configure -i
 oracleasm init
 
-# node1:
-Copy and unzip grid setup to $ORACLE_HOME
+#node1:
 fdisk /dev/sdb
 ...
 lsblk -f
@@ -136,19 +217,14 @@ oracleasm listdisks
 oracleasm scandisks
 oracleasm listdisks
 
-
 #node1:
-cd /u01/app/19c/grid/deinstall
-./sshUserSetup.sh -user grid -hosts "node1 node2" -noPromptPassphrase -confirm -advanced
 
 mkdir -p /u01/app/oraInventory
 cd $ORACLE_HOME
-export CV_ASSUME_DISTID=OEL8
+export CV_ASSUME_DISTID=OEL8 #it for bypass sshpasswordless bug
 sudo chown -R grid:oinstall .
 ./gridSetup.sh
+./runcluvfy.sh comp nodecon -n node1,node2 -verbose
 
-#node1,2:
-cd /u01/app/19c/grid/cv/rpm
-rpm -Uvh cvuqdisk-1.0.10-1.rpm
 
 
