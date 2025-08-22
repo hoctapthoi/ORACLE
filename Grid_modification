@@ -1,0 +1,59 @@
+## backup OCR configure 
+# check current configure
+[grid@node1 ~]$ ocrcheck -config
+Oracle Cluster Registry configuration is :
+      Device/File Name : +OCR
+# check current current resouce:
+[grid@node1 ~]$ crsctl stat res -t
+...
+ora.DATA.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       node1                    STABLE
+      2        ONLINE  ONLINE       node2                    STABLE
+      3        OFFLINE OFFLINE                               STABLE
+ora.OCR.dg(ora.asmgroup)
+      1        ONLINE  ONLINE       node1                    STABLE
+      2        ONLINE  ONLINE       node2                    STABLE
+      3        OFFLINE OFFLINE                               STABLE
+
+...
+# backup OCR to FRA:
+[root@node1 ~]# ocrconfig -add +DATA
+[root@node1 ~]# ocrcheck -config
+Oracle Cluster Registry configuration is :
+         Device/File Name         :       +OCR
+         Device/File Name         :      +DATA
+
+[root@node1 ~]# cat /etc/oracle/ocr.loc
+#Device/file  getting replaced by device +DATA/node/OCRFILE/registry.255.1209731567
+ocrconfig_loc=+OCR/node/OCRFILE/registry.255.1209270779
+ocrmirrorconfig_loc=+DATA/node/OCRFILE/registry.255.1209731567
+
+## backup ocr configure
+# ocr backup every 4 hours automatically
+# perform manual backup:
+[root@node1 ~]# ocrconfig -showbackup
+PROT-24: Auto backups for the Oracle Cluster Registry are not available
+PROT-25: Manual backups for the Oracle Cluster Registry are not available
+[root@node1 ~]# ocrconfig -manualbackup
+
+node1     2025/08/22 12:36:12     +OCR:/node/OCRBACKUP/backup_20250822_123612.ocr.258.1209818173     724960844
+[root@node1 ~]# ocrconfig -showbackup
+PROT-24: Auto backups for the Oracle Cluster Registry are not available
+
+node1     2025/08/22 12:36:12     +OCR:/node/OCRBACKUP/backup_20250822_123612.ocr.258.1209818173     724960844
+
+## check location of OLR on a node:
+[root@node1 ~]# ocrcheck -local
+Status of Oracle Local Registry is as follows :
+         Version                  :          4
+         Total space (kbytes)     :     491684
+         Used space (kbytes)      :      83144
+         Available space (kbytes) :     408540
+         ID                       : 1872256531
+         Device/File Name         : /u01/app/grid/crsdata/node1/olr/node1_19.olr
+                                    Device/File integrity check succeeded
+
+         Local registry integrity check succeeded
+
+         Logical corruption check succeeded
+
