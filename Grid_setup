@@ -1,5 +1,4 @@
-
-#####Grid installation on OEL8
+###Grid installation for OEL8
 #new
 mount /dev/cdrom /mnt
 cd /etc/yum.repos.d/
@@ -18,8 +17,7 @@ gpgcheck=0
 baseurl=file:///mnt/AppStream
 EOF
 
-yum install -y oracle-database-preinstall* oracleasm* net-tools telnet
-
+yum install -y oracle-database-preinstall* *oracleasm* net-tools telnet
 
 sudo tee -a /etc/hosts > /dev/null <<'EOF'
 # Public
@@ -58,7 +56,6 @@ systemctl disable firewalld
 setenforce 0
 sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
 
-
 mkdir -p /u01/app/19c/grid
 mkdir -p /u01/app/grid
 mkdir -p /u01/app/oracle/product/19c/db_1
@@ -67,13 +64,20 @@ chown oracle:oinstall /u01/app/oracle
 chmod -R 775 /u01/
 
 sudo tee -a /home/oracle/.bash_profile > /dev/null <<'EOF'
+HOSTNAME=$(hostname)
+SID_SUFFIX=$(echo "$HOSTNAME" | grep -o '[0-9]\+$' | sed 's/^0*//') 
+if [ -n "$SID_SUFFIX" ]; then 
+    export ORACLE_SID="orcl$SID_SUFFIX" 
+else 
+     export ORACLE_SID="orcl" 
+fi
 export TMP=/tmp
 export TMPDIR=$TMP
 export ORACLE_BASE=/u01/app/oracle
 #export GRID_HOME=/u01/app/19c/grid
 export DB_HOME=$ORACLE_BASE/product/19c/db_1
 export ORACLE_HOME=$DB_HOME
-export ORACLE_SID=orcl
+#export ORACLE_SID=orcl
 export ORACLE_TERM=xterm
 #export BASE_PATH=/usr/sbin:$PATH
 export PATH=$ORACLE_HOME/bin:$PATH
@@ -90,13 +94,21 @@ alias ss='sqlplus / as sysasm'
 EOF
 
 sudo tee -a /home/grid/.bash_profile > /dev/null <<'EOF'
-export ORACLE_SID=+ASM1
+HOSTNAME=$(hostname)
+SID_SUFFIX=$(echo "$HOSTNAME" | grep -o '[0-9]\+$' | sed 's/^0*//') 
+if [ -n "$SID_SUFFIX" ]; then 
+    export ORACLE_SID="+ASM$SID_SUFFIX" 
+else 
+     export ORACLE_SID="+ASM" 
+fi
+#export ORACLE_SID=+ASM1
 export ORACLE_HOME=/u01/app/19c/grid
 export PATH=$ORACLE_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
 export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
 umask 022
 EOF
+
 chmod u+x /home/grid/.bash_profile
 chmod u+x /home/oracle/.bash_profile
 chmod u+x /home/grid/.bashrc
@@ -181,7 +193,7 @@ grid hard memlock 3500000
 # oracle hard stack 32768
 EOF
 
-##copy and unzip  grid.zip on node1
+copy and unzip  grid.zip
 cd /u01/app/19c/grid/deinstall
 ./sshUserSetup.sh -user grid -hosts "node1 node2" -noPromptPassphrase -confirm -advanced
 
@@ -218,7 +230,6 @@ oracleasm scandisks
 oracleasm listdisks
 
 #node1:
-
 mkdir -p /u01/app/oraInventory
 cd $ORACLE_HOME
 export CV_ASSUME_DISTID=OEL8 #it for bypass sshpasswordless bug
