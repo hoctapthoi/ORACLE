@@ -1,0 +1,25 @@
+addNode:
+# prepare hosts file on both node
+# configure passwordless for new node
+cd /u01/app/19c/grid/deinstall
+./sshUserSetup.sh -user grid -hosts "node1 node2 node3" -noPromptPassphrase -confirm -advanced
+
+#verify cluster preparation
+cluvfy stage -pre crsinst -n  node3
+
+# oracleasm setup
+oracleasm configure -t
+oracleasm init
+oracleasm scandisks
+oracleasm listdisks
+
+# addNode
+[grid@node1 grid]$ cd /u01/app/19c/grid/addnode/
+
+# add node3 information
+node3.localdomain	node3-vip.localdomain	
+
+remove node
+[grid@node3 ~]$ cd /u01/app/19c/grid/deinstall
+[grid@node3 deinstall]$ ./deinstall -local
+a
