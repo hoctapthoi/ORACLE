@@ -57,3 +57,46 @@ Status of Oracle Local Registry is as follows :
 
          Logical corruption check succeeded
 
+## HAIP
+# create new network card (enp0s9)
+# enable interface on OS
+nmcli device connect enp0s9
+nmtui #configure interface
+nmcli device disconnect enp0s9; nmcli device connect enp0s9
+# add hosts
+192.168.60.121 node3-priv.localdomain node3-priv
+192.168.60.122 node4-priv.localdomain node4-priv
+# getif
+[root@node1 ~]# oifcfg iflist
+enp0s3  192.168.56.0
+enp0s8  192.168.159.0
+enp0s8  169.254.0.0
+enp0s9  192.168.60.0 # new interface
+[root@node1 ~]# olsnodes -s
+node1   Active
+node2   Active
+[root@node1 ~]# oifcfg getif
+enp0s3  192.168.56.0  global  public
+enp0s8  192.168.159.0  global  cluster_interconnect,asm
+# add interface to cluster
+oifcfg setif -global enp0s9/192.168.60.0:cluster_interconnect,asm        # configure on a node only
+[root@node1 ~]# oifcfg getif
+enp0s3  192.168.56.0  global  public
+enp0s8  192.168.159.0  global  cluster_interconnect,asm
+enp0s9  192.168.60.0  global  cluster_interconnect,asm
+# restart clusterware
+srvctl stop database -db orcl
+crsctl stop cluster -all
+crsctl start cluster -all
+srvctl start database -db orcl
+...
+CRS-2672: Attempting to start 'ora.cluster_interconnect.haip' on 'node2'
+...
+CRS-2672: Attempting to start 'ora.cluster_interconnect.haip' on 'node1'
+...
+# verify
+[root@node2 ~]# ip a | grep 169.254 
+      inet 169.254.28.12/20 brd 169.254.31.255 scope global enp0s8:1 
+      inet 169.254.8.228/20 brd 169.254.15.255 scope global enp0s9:1
+
+
