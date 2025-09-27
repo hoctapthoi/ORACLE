@@ -1,0 +1,11 @@
+=========== list user tables ===========
+select * from (SELECT owner, table_name 
+FROM dba_tables 
+WHERE owner NOT IN ('SYS','SYSTEM','DBSNMP','SYSMAN','OUTLN','MGMT_VIEW','FLOWS_FILES','MDSYS','ORDSYS','EXFSYS','WMSYS','APPQOSSYS','APEX_030200','OWBSYS','OWBSYS_AUDIT','SCOTT','XDB','CTXSYS','ANONYMOUS','XS$NULL','OJVMSYS','GSMADMIN_INTERNAL','FLOWS_FILES','APEX_PUBLIC_USER')
+ORDER BY owner, table_name)
+PIVOT (
+    COUNT(table_name) 
+    FOR owner IN ('HR' as HR_TABLES, 'SCOTT' as SCOTT_TABLES, 'OE' as OE_TABLES)
+);
+
+
