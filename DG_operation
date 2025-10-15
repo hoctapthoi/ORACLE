@@ -1,0 +1,54 @@
+###### DG discount because miss a datafile #############
+### 1. verify connection ###
+tnsping xxx
+tnsping xxxDB
+SQL> sqlplus sys/Admin123@xxx as sysdba
+SQL> SELECT name, open_mode, database_role FROM v$database;
+SQL> EXIT;
+
+SQL> sqlplus sys/Admin123@xxxDB as sysdba
+SQL> SELECT name, open_mode, database_role FROM v$database;
+SQL> EXIT;
+
+```bash
+# Password file phải giống nhau trên cả Primary và Standby
+ls -l $ORACLE_HOME/dbs/orapwUAT
+ls -l $ORACLE_HOME/dbs/orapwFLEXUAT
+
+**Trên Standby:**
+```sql
+-- Kiểm tra datafile có vấn đề
+SELECT FILE#, NAME, STATUS, ERROR 
+FROM V$DATAFILE 
+WHERE STATUS != 'ONLINE' OR ERROR IS NOT NULL;
+
+-- Ví dụ kết quả:
+-- FILE#  NAME                                          STATUS   ERROR
+-- -----  --------------------------------------------  -------  --------
+-- 14     /oracledata/data/flexuat/users02.dbf          RECOVER  FILE NOT FOUND
+
+**Kiểm tra Apply Lag:**
+```bash
+dgmgrl / <<EOF
+SHOW DATABASE flexuat;
+EXIT;
+EOF
+
+# Chú ý: Apply Lag: 4 hours 21 minutes
+```
+
+### 2.3. Kiểm tra GAP
+-- Kiểm tra archive log gap
+SELECT * FROM V$ARCHIVE_GAP;
+
+-- Nếu có gap, cần resolve trước khi proceed
+
+### sử dụng RECOVER FROM SERVICE để khôi phục ###
+```bash
+# Kết nối với cả TARGET (Standby) và AUXILIARY (Primary)
+rman TARGET sys/Admin123@FLEXUAT AUXILIARY sys/Admin123@UAT
+
+RMAN> RECOVER DATABASE FROM SERVICE 'UAT';
+```
+
+
