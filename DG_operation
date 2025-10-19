@@ -2,18 +2,18 @@
 ### 1. verify connection ###
 tnsping xxx
 tnsping xxxDB
-SQL> sqlplus sys/Admin123@xxx as sysdba
+SQL> sqlplus sys/Abcd123@xxx as sysdba
 SQL> SELECT name, open_mode, database_role FROM v$database;
 SQL> EXIT;
 
-SQL> sqlplus sys/Admin123@xxxDB as sysdba
+SQL> sqlplus sys/Abcd123@xxxDB as sysdba
 SQL> SELECT name, open_mode, database_role FROM v$database;
 SQL> EXIT;
 
 ```bash
 # Password file phải giống nhau trên cả Primary và Standby
-ls -l $ORACLE_HOME/dbs/orapwUAT
-ls -l $ORACLE_HOME/dbs/orapwFLEXUAT
+ls -l $ORACLE_HOME/dbs/orapwxxx
+ls -l $ORACLE_HOME/dbs/orapwxxxDB
 
 **Trên Standby:**
 ```sql
@@ -22,15 +22,14 @@ SELECT FILE#, NAME, STATUS, ERROR
 FROM V$DATAFILE 
 WHERE STATUS != 'ONLINE' OR ERROR IS NOT NULL;
 
--- Ví dụ kết quả:
 -- FILE#  NAME                                          STATUS   ERROR
 -- -----  --------------------------------------------  -------  --------
--- 14     /oracledata/data/flexuat/users02.dbf          RECOVER  FILE NOT FOUND
+-- 14     /oracledata/data/xxxDB/users02.dbf          RECOVER  FILE NOT FOUND
 
 **Kiểm tra Apply Lag:**
 ```bash
 dgmgrl / <<EOF
-SHOW DATABASE flexuat;
+SHOW DATABASE xxxDB;
 EXIT;
 EOF
 
@@ -46,9 +45,23 @@ SELECT * FROM V$ARCHIVE_GAP;
 ### sử dụng RECOVER FROM SERVICE để khôi phục ###
 ```bash
 # Kết nối với cả TARGET (Standby) và AUXILIARY (Primary)
-rman TARGET sys/Admin123@FLEXUAT AUXILIARY sys/Admin123@UAT
+rman TARGET sys/Abcd123@xxxDB AUXILIARY sys/Abcd123@xxx
 
-RMAN> RECOVER DATABASE FROM SERVICE 'UAT';
-```
+# tạo missing datafile sau đó recover database from service
+RMAN> RUN {
+  SET NEWNAME FOR DATAFILE 14 TO '/oracledata/data/xxxDB/users02.dbf';
+  RESTORE DATAFILE 14 FROM SERVICE 'xxx';
+  SWITCH DATAFILE 14;
+  RECOVER DATABASE;
+}
 
+# khởi động MRP service:
+dgmgrl sys/Abcd123@xxx
+EDIT DATABASE xxxDB SET STATE='APPLY-ON';
+
+# check MRP service state
+DGMGRL> show database xxxDB
+SQL> SELECT PROCESS, STATUS, THREAD#, SEQUENCE# 
+FROM V$MANAGED_STANDBY 
+WHERE PROCESS LIKE 'MRP%';
 
