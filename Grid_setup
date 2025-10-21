@@ -234,8 +234,23 @@ mkdir -p /u01/app/oraInventory
 cd $ORACLE_HOME
 export CV_ASSUME_DISTID=OEL8 #it for bypass sshpasswordless bug
 sudo chown -R grid:oinstall .
+
+# fix passwordless issue on both node
+mv /usr/bin/scp /usr/bin/scp.bak
+sudo tee /usr/bin/scp > /dev/null << 'EOF'
+#!/bin/bash
+/usr/bin/scp.bak -T "$@"
+EOF
+chmod a+rx /usr/bin/scp
+cat /usr/bin/scp
+
+# install grid
 ./gridSetup.sh
 ./runcluvfy.sh comp nodecon -n node1,node2 -verbose
 
+# reset/rollback scp
+sudo rm /usr/bin/scp
+sudo mv /usr/bin/scp.bak /usr/bin/scp
+file /usr/bin/scp
 
 
