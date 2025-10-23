@@ -1,0 +1,18 @@
+-- Xem các câu lệnh đang thực thi
+SELECT 
+    s.sid,
+    s.serial#,
+    s.username,
+    s.status,
+    s.machine,
+    s.program,
+    sq.sql_text,
+    sq.sql_fulltext
+FROM v$session s
+JOIN v$sql sq ON s.sql_id = sq.sql_id
+WHERE s.status = 'ACTIVE' 
+and s.username='SYS'
+AND s.username IS NOT NULL;
+
+-- kill session
+alter system kill session '<SID>,<SERIAL#>' IMMEDIATE;
