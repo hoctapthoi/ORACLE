@@ -271,13 +271,9 @@ fdisk /dev/sdd
 
 ----7.2 all node---
 vi /etc/udev/rules.d/99-oracleasm.rules
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB21791420-f0aa669b", SYMLINK+="asm-disk1", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VBde9bd1cf-68761f6c", SYMLINK+="asm-disk2", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB14ac6fa7-db4b2bac", SYMLINK+="asm-disk3", OWNER="grid", GROUP="asmadmin", MODE="0660"
-
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VBc012cf82-c8f821fe", SYMLINK+="asm-disk4", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB58d72f53-0fcdedb1", SYMLINK+="asm-disk5", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sd?1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/$parent", RESULT=="1ATA_VBOX_HARDDISK_VB9d0c38d7-e5279757", SYMLINK+="asm-disk6", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdb1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VBf3bb338c-14d7d14c", SYMLINK+="asm-disk1", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdc1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VB21152ccc-58168968", SYMLINK+="asm-disk2", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdd1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VB1dd3fbb7-83434022", SYMLINK+="asm-disk3", OWNER="grid", GROUP="asmadmin", MODE="0660"
 
 udevadm control --reload-rules
 /sbin/partprobe /dev/sdb
