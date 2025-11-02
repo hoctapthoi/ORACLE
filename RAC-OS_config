@@ -271,14 +271,18 @@ fdisk /dev/sdd
 
 ----7.2 all node---
 vi /etc/udev/rules.d/99-oracleasm.rules
-KERNEL=="sdb1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VBf3bb338c-14d7d14c", SYMLINK+="asm-disk1", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sdc1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VB21152ccc-58168968", SYMLINK+="asm-disk2", OWNER="grid", GROUP="asmadmin", MODE="0660"
-KERNEL=="sdd1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d $parent", RESULT=="1ATA_VBOX_HARDDISK_VB1dd3fbb7-83434022", SYMLINK+="asm-disk3", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdb1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/sdb", RESULT=="1ATA_VBOX_HARDDISK_VBf3bb338c-14d7d14c", SYMLINK+="asm-disk1", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdc1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/sdc", RESULT=="1ATA_VBOX_HARDDISK_VB21152ccc-58168968", SYMLINK+="asm-disk2", OWNER="grid", GROUP="asmadmin", MODE="0660"
+KERNEL=="sdd1", SUBSYSTEM=="block", PROGRAM=="/usr/lib/udev/scsi_id -g -u -d /dev/sdd", RESULT=="1ATA_VBOX_HARDDISK_VB1dd3fbb7-83434022", SYMLINK+="asm-disk3", OWNER="grid", GROUP="asmadmin", MODE="0660"
 
-udevadm control --reload-rules
-/sbin/partprobe /dev/sdb
-/sbin/partprobe /dev/sdc
-/sbin/partprobe /dev/sdd
+udevadm control --reload-rules 
+udevadm trigger --type=devices --action=change
+ 
+ls -la /dev/asm-*
+lrwxrwxrwx. 1 root root 4 Nov  2 00:21 /dev/asm-disk1 -> sdb1
+lrwxrwxrwx. 1 root root 4 Nov  2 00:21 /dev/asm-disk2 -> sdc1
+lrwxrwxrwx. 1 root root 4 Nov  2 00:21 /dev/asm-disk3 -> sdd1
+
 
 8) Disable firewall
 systemctl stop firewalld
