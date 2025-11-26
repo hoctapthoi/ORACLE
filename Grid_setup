@@ -17,7 +17,7 @@ gpgcheck=0
 baseurl=file:///mnt/AppStream
 EOF
 
-yum install -y oracle-database-preinstall* *oracleasm* net-tools telnet
+yum install -y oracle-database-preinstall* net-tools telnet bash-completion tree
 
 sudo tee -a /etc/hosts > /dev/null <<'EOF'
 # Public
