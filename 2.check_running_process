@@ -1,0 +1,60 @@
+---- blocking sessions -----
+SELECT 
+    s.sid,
+    s.serial#,
+    s.username,
+    s.status,
+    s.program,
+    s.module,
+    s.event,
+    s.wait_class,
+    s.seconds_in_wait,
+    s.state,
+    sq.sql_text,
+    s.blocking_session
+FROM 
+    v$session s
+LEFT JOIN v$sql sq ON s.sql_id = sq.sql_id
+WHERE 
+    s.username IS NOT NULL
+    AND s.status = 'ACTIVE' 
+    --and sql_text like '%create%'
+ORDER BY s.seconds_in_wait DESC;
+
+-- ALTER SYSTEM KILL SESSION '2441,56461' IMMEDIATE;
+
+
+------- running job -------
+ SELECT 
+    job_name,
+    job_type,
+    job_action,
+    state,
+    enabled,
+    run_count,
+    failure_count,
+    last_start_date,
+    last_run_duration,
+    next_run_date
+FROM 
+    dba_scheduler_jobs
+WHERE 
+    state = 'RUNNING'
+ORDER BY last_start_date DESC;
+
+--
+--BEGIN
+--    DBMS_SCHEDULER.STOP_JOB(
+--        job_name => 'JOB_NAME',
+--        force    => TRUE
+--    );
+--END;
+--/
+
+--BEGIN
+--    DBMS_SCHEDULER.RUN_JOB(
+--        job_name => 'JOB_NAME',
+--        use_current_session => FALSE
+--    );
+--END;
+--/
