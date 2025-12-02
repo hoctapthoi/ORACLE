@@ -1,0 +1,278 @@
+---table_special_list-----
+SELECT 
+    t.owner,
+    t.table_name,
+    CASE WHEN t.temporary = 'Y' THEN 'YES' END AS is_temporary,
+    CASE WHEN t.iot_type IS NOT NULL THEN 'YES' END AS is_iot,
+    CASE WHEN t.cluster_name IS NOT NULL THEN 'YES' END AS is_clustered,
+    CASE WHEN t.compression = 'ENABLED' THEN 'YES' END AS is_compressed,
+    CASE WHEN t.inmemory = 'ENABLED' THEN 'YES' END AS is_inmemory,
+    CASE WHEN t.read_only = 'YES' THEN 'YES' END AS is_readonly,
+    CASE WHEN pt.table_name IS NOT NULL THEN 'YES' END AS is_partitioned,
+    CASE WHEN et.table_name IS NOT NULL THEN 'YES' END AS is_external,
+    CASE WHEN fi.table_name IS NOT NULL THEN 'YES' END AS has_functional_idx,
+    CASE WHEN lob.table_name IS NOT NULL THEN 'YES' END AS has_lob,
+    CASE WHEN vc.table_name IS NOT NULL THEN 'YES' END AS has_virtual_col,
+    CASE WHEN trg.table_name IS NOT NULL THEN 'YES' END AS has_triggers,
+    CASE WHEN ot.table_name IS NOT NULL THEN 'YES' END AS is_object_table,
+    t.num_rows,
+    ROUND(ts.bytes/1024/1024, 2) AS size_mb
+FROM dba_tables t
+LEFT JOIN dba_part_tables pt 
+    ON t.owner = pt.owner AND t.table_name = pt.table_name
+LEFT JOIN dba_external_tables et 
+    ON t.owner = et.owner AND t.table_name = et.table_name
+LEFT JOIN dba_object_tables ot 
+    ON t.owner = ot.owner AND t.table_name = ot.table_name
+LEFT JOIN (
+    SELECT owner, segment_name, SUM(bytes) AS bytes
+    FROM dba_segments
+    WHERE segment_type = 'TABLE'
+    GROUP BY owner, segment_name
+) ts ON t.owner = ts.owner AND t.table_name = ts.segment_name
+LEFT JOIN (
+    -- Bảng có functional index
+    SELECT DISTINCT table_owner, table_name
+    FROM dba_ind_expressions
+) fi ON t.owner = fi.table_owner AND t.table_name = fi.table_name
+LEFT JOIN (
+    -- Bảng có LOB columns
+    SELECT DISTINCT owner, table_name
+    FROM dba_lobs
+) lob ON t.owner = lob.owner AND t.table_name = lob.table_name
+LEFT JOIN (
+    -- Bảng có virtual columns
+    SELECT DISTINCT owner, table_name
+    FROM dba_tab_cols
+    WHERE virtual_column = 'YES'
+) vc ON t.owner = vc.owner AND t.table_name = vc.table_name
+LEFT JOIN (
+    -- Bảng có triggers
+    SELECT DISTINCT owner, table_name
+    FROM dba_triggers
+    WHERE table_owner IS NOT NULL
+) trg ON t.owner = trg.owner AND t.table_name = trg.table_name
+WHERE t.owner NOT IN ('SYS','SYSTEM','OUTLN','XDB','MDSYS','ORDSYS','CTXSYS')
+  -- Điều kiện: Có ít nhất 1 tiêu chí đặc biệt
+  AND (
+    t.temporary = 'Y'
+    OR t.iot_type IS NOT NULL
+    OR t.cluster_name IS NOT NULL
+    OR t.compression = 'ENABLED'
+    OR t.inmemory = 'ENABLED'
+    OR t.read_only = 'YES'
+    OR pt.table_name IS NOT NULL
+    OR et.table_name IS NOT NULL
+    OR fi.table_name IS NOT NULL
+    OR lob.table_name IS NOT NULL
+    OR vc.table_name IS NOT NULL
+    OR trg.table_name IS NOT NULL
+    OR ot.table_name IS NOT NULL
+  )
+ORDER BY t.owner, t.table_name;
+
+
+------ each special factor-------------
+1. In-Memory Tables
+sql-- Kiểm tra bảng được enable In-Memory
+SELECT 
+    owner,
+    table_name,
+    inmemory,
+    inmemory_priority,
+    inmemory_compression,
+    inmemory_distribute
+FROM dba_tables
+WHERE inmemory = 'ENABLED'
+ORDER BY owner, table_name;
+2. Partitioned Tables (Bảng phân vùng)
+sql-- Danh sách bảng có partition
+SELECT 
+    owner,
+    table_name,
+    partitioning_type,
+    partition_count,
+    subpartitioning_type
+FROM dba_part_tables
+ORDER BY owner, table_name;
+
+-- Chi tiết các partition
+SELECT 
+    table_owner,
+    table_name,
+    partition_name,
+    high_value,
+    num_rows,
+    compression
+FROM dba_tab_partitions
+WHERE table_owner = 'YOUR_SCHEMA'
+ORDER BY table_name, partition_position;
+3. Index-Organized Tables (IOT)
+sqlSELECT 
+    owner,
+    table_name,
+    iot_type,
+    iot_name,
+    pct_threshold
+FROM dba_tables
+WHERE iot_type IS NOT NULL
+ORDER BY owner, table_name;
+4. Temporary Tables
+sqlSELECT 
+    owner,
+    table_name,
+    temporary,
+    duration  -- SYS$SESSION hoặc SYS$TRANSACTION
+FROM dba_tables
+WHERE temporary = 'Y'
+ORDER BY owner, table_name;
+5. External Tables
+sqlSELECT 
+    owner,
+    table_name,
+    type_owner,
+    type_name,
+    default_directory_name
+FROM dba_external_tables
+ORDER BY owner, table_name;
+6. Compressed Tables
+sqlSELECT 
+    owner,
+    table_name,
+    compression,
+    compress_for
+FROM dba_tables
+WHERE compression = 'ENABLED'
+ORDER BY owner, table_name;
+7. Tables với Functional Index
+sql-- Bảng có functional/function-based index
+SELECT DISTINCT
+    table_owner,
+    table_name,
+    index_name,
+    index_type
+FROM dba_ind_columns
+WHERE column_name LIKE 'SYS_%'  -- Function-based index tạo virtual column
+ORDER BY table_owner, table_name;
+
+-- Chi tiết expression của functional index
+SELECT 
+    ic.table_owner,
+    ic.table_name,
+    ic.index_name,
+    ie.column_expression
+FROM dba_ind_columns ic
+JOIN dba_ind_expressions ie 
+    ON ic.index_owner = ie.index_owner 
+    AND ic.index_name = ie.index_name
+    AND ic.column_position = ie.column_position
+ORDER BY ic.table_owner, ic.table_name;
+8. Tables với các loại Index đặc biệt
+Bitmap Index:
+sqlSELECT 
+    table_owner,
+    table_name,
+    index_name,
+    index_type
+FROM dba_indexes
+WHERE index_type = 'BITMAP'
+ORDER BY table_owner, table_name;
+Domain Index (Text, Spatial):
+sqlSELECT 
+    table_owner,
+    table_name,
+    index_name,
+    index_type,
+    ityp_owner,
+    ityp_name
+FROM dba_indexes
+WHERE index_type LIKE 'DOMAIN%'
+ORDER BY table_owner, table_name;
+9. Clustered Tables
+sqlSELECT 
+    owner,
+    table_name,
+    cluster_owner,
+    cluster_name
+FROM dba_tables
+WHERE cluster_name IS NOT NULL
+ORDER BY owner, table_name;
+10. Tables với Virtual Columns
+sqlSELECT 
+    owner,
+    table_name,
+    column_name,
+    data_type,
+    data_default,
+    virtual_column
+FROM dba_tab_cols
+WHERE virtual_column = 'YES'
+ORDER BY owner, table_name, column_id;
+11. Tables với LOB Columns
+sqlSELECT 
+    owner,
+    table_name,
+    column_name,
+    segment_name,
+    in_row,
+    securefile,
+    compression,
+    deduplication
+FROM dba_lobs
+ORDER BY owner, table_name;
+12. Tables có Triggers
+sqlSELECT DISTINCT
+    owner,
+    table_name,
+    COUNT(*) AS trigger_count
+FROM dba_triggers
+WHERE table_owner IS NOT NULL
+GROUP BY owner, table_name
+ORDER BY trigger_count DESC;
+13. Materialized Views
+sqlSELECT 
+    owner,
+    mview_name,
+    refresh_mode,
+    refresh_method,
+    fast_refreshable,
+    last_refresh_date
+FROM dba_mviews
+ORDER BY owner, mview_name;
+14. Read-Only Tables
+sqlSELECT 
+    owner,
+    table_name,
+    read_only
+FROM dba_tables
+WHERE read_only = 'YES'
+ORDER BY owner, table_name;
+
+15. Object Tables
+sqlSELECT 
+    owner,
+    table_name,
+    table_type_owner,
+    table_type
+FROM dba_object_tables
+ORDER BY owner, table_name;
+
+16. Tables với Invisible Columns
+sqlSELECT 
+    owner,
+    table_name,
+    column_name,
+    hidden_column
+FROM dba_tab_cols
+WHERE hidden_column = 'YES'
+ORDER BY owner, table_name;
+
+17. Nested Tables
+sqlSELECT 
+    owner,
+    table_name,
+    parent_table_name,
+    parent_table_column
+FROM dba_nested_tables
+ORDER BY owner, parent_table_name;
+Qu
