@@ -1,0 +1,119 @@
+1. Top 10 bảng có dung lượng lớn nhất
+sql-- Dùng DBA_SEGMENTS (nếu có quyền DBA)
+SELECT 
+    owner,
+    segment_name AS table_name,
+    ROUND(bytes/1024/1024/1024, 2) AS size_gb,
+    ROUND(bytes/1024/1024, 2) AS size_mb
+FROM dba_segments
+WHERE segment_type = 'TABLE'
+ORDER BY bytes DESC
+FETCH FIRST 10 ROWS ONLY;
+
+-- Hoặc dùng USER_SEGMENTS (cho schema hiện tại)
+SELECT 
+    segment_name AS table_name,
+    ROUND(bytes/1024/1024/1024, 2) AS size_gb,
+    ROUND(bytes/1024/1024, 2) AS size_mb
+FROM user_segments
+WHERE segment_type = 'TABLE'
+ORDER BY bytes DESC
+FETCH FIRST 10 ROWS ONLY;
+
+2. Top 10 bảng có số row/column lớn nhất
+Số row lớn nhất:
+sqlSELECT 
+    owner,
+    table_name,
+    num_rows,
+    blocks,
+    avg_row_len
+FROM dba_tables
+WHERE num_rows IS NOT NULL
+ORDER BY num_rows DESC
+FETCH FIRST 10 ROWS ONLY;
+
+Số column lớn nhất:
+sqlSELECT 
+    owner,
+    table_name,
+    COUNT(*) AS column_count
+FROM dba_tab_columns
+GROUP BY owner, table_name
+ORDER BY column_count DESC
+FETCH FIRST 10 ROWS ONLY;
+
+Kết hợp cả row và column:
+sqlSELECT 
+    t.owner,
+    t.table_name,
+    t.num_rows,
+    c.column_count,
+    ROUND((t.num_rows * c.column_count) / 1000000, 2) AS cells_millions
+FROM dba_tables t
+JOIN (
+    SELECT owner, table_name, COUNT(*) AS column_count
+    FROM dba_tab_columns
+    GROUP BY owner, table_name
+) c ON t.owner = c.owner AND t.table_name = c.table_name
+WHERE t.num_rows IS NOT NULL
+ORDER BY (t.num_rows * c.column_count) DESC
+FETCH FIRST 10 ROWS ONLY;
+
+3. Top 10 bảng có lượng truy cập lớn nhất
+Sử dụng AWR (cần license Diagnostic Pack):
+sql-- Thống kê trong 1 ngày
+SELECT 
+    obj.owner,
+    obj.object_name AS table_name,
+    SUM(stat.logical_reads_total) AS total_reads,
+    SUM(stat.physical_reads_total) AS total_physical_reads,
+    SUM(stat.db_block_changes_total) AS total_changes
+FROM dba_hist_seg_stat stat
+JOIN dba_objects obj ON stat.obj# = obj.object_id
+JOIN dba_hist_snapshot snap ON stat.snap_id = snap.snap_id
+WHERE obj.object_type = 'TABLE'
+  AND snap.begin_interval_time >= SYSDATE - 1  -- 1 ngày
+GROUP BY obj.owner, obj.object_name
+ORDER BY SUM(stat.logical_reads_total) DESC
+FETCH FIRST 10 ROWS ONLY;
+
+-- Thống kê trong 7 ngày
+-- Đổi: SYSDATE - 1 thành SYSDATE - 7
+
+-- Thống kê trong 30 ngày
+-- Đổi: SYSDATE - 1 thành SYSDATE - 30
+Sử dụng V$SEGMENT_STATISTICS (thời gian thực, không cần license):
+sqlSELECT 
+    owner,
+    object_name AS table_name,
+    statistic_name,
+    value
+FROM v$segment_statistics
+WHERE object_type = 'TABLE'
+  AND statistic_name IN (
+    'logical reads',
+    'physical reads',
+    'db block changes',
+    'buffer busy waits'
+  )
+ORDER BY value DESC
+FETCH FIRST 10 ROWS ONLY;
+
+Query tổng hợp lượng truy cập:
+sqlSELECT 
+    owner,
+    object_name AS table_name,
+    SUM(CASE WHEN statistic_name = 'logical reads' THEN value ELSE 0 END) AS logical_reads,
+    SUM(CASE WHEN statistic_name = 'physical reads' THEN value ELSE 0 END) AS physical_reads,
+    SUM(CASE WHEN statistic_name = 'db block changes' THEN value ELSE 0 END) AS db_changes
+FROM v$segment_statistics
+WHERE object_type = 'TABLE'
+GROUP BY owner, object_name
+ORDER BY logical_reads DESC
+FETCH FIRST 10 ROWS ONLY;
+Lưu ý quan trọng:
+
+Quyền truy cập: Cần quyền SELECT trên các view DBA_* hoặc dùng USER_* cho schema của bạn
+Statistics: Chạy EXEC DBMS_STATS.GATHER_SCHEMA_STATS('schema_name'); để cập nhật thống kê nếu số liệu không chính xác
+AWR: V$SEGMENT_STATISTICS chỉ lưu thống kê từ lần khởi động gần nhất, còn AWR lưu lịch sử lâu dài nhưng cần license
