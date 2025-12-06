@@ -1,5 +1,5 @@
 
-yum install -y oracle-database-preinstall-21c telnet net-tools tree bash-completion
+yum install -y oracle-database-preinstall-21c telnet net-tools tree bash-completion zip
 
 systemctl stop firewalld
 systemctl disable firewalld
@@ -12,6 +12,7 @@ chown oracle:oinstall /u01 /u02 /u03 -R
 chmod -R 775 /u01 /u02 /u03 
 
 echo "123" | sudo passwd --stdin oracle
+usermod -aG wheel oracle
 
 cp /etc/security/limits.conf /etc/security/limits.conf.bak
 tee -a /etc/security/limits.conf > /dev/null <<'EOF'
