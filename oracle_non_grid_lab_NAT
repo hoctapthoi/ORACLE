@@ -1,0 +1,59 @@
+
+yum install -y oracle-database-preinstall-21c telnet net-tools tree bash-completion
+
+systemctl stop firewalld
+systemctl disable firewalld
+
+setenforce 0
+sudo sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config
+
+mkdir -p /u01/app/oracle/product/19c/db_1 /u02/oradata /u03/fra
+chown oracle:oinstall /u01 /u02 /u03 -R
+chmod -R 775 /u01 /u02 /u03 
+
+echo "123" | sudo passwd --stdin oracle
+
+cp /etc/security/limits.conf /etc/security/limits.conf.bak
+tee -a /etc/security/limits.conf > /dev/null <<'EOF'
+oracle soft nofile 131072
+oracle hard nofile 131072
+oracle soft nproc 131072
+oracle hard nproc 131072
+oracle soft core unlimited
+oracle hard core unlimited
+oracle soft memlock 3500000
+oracle hard memlock 3500000
+grid soft nofile 131072
+grid hard nofile 131072
+grid soft nproc 131072
+grid hard nproc 131072
+grid soft core unlimited
+grid hard core unlimited
+grid soft memlock 3500000
+grid hard memlock 3500000
+# Recommended stack hard limit 32MB for oracle installations
+# oracle hard stack 32768
+EOF
+
+
+su - oracle
+
+vi .bash_profile
+alias ss='sqlplus / as sysdba'
+export TMP=/tmp
+export TMPDIR=$TMP
+export ORACLE_BASE=/u01/app/oracle
+#export GRID_HOME=/u01/app/19c/grid
+export DB_HOME=$ORACLE_BASE/product/19c/db_1
+export ORACLE_HOME=$DB_HOME
+export ORACLE_SID=orcl
+export ORACLE_TERM=xterm
+#export BASE_PATH=/usr/sbin:$PATH
+export PATH=$ORACLE_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$ORACLE_HOME/lib:/lib:/usr/lib
+export CLASSPATH=$ORACLE_HOME/JRE:$ORACLE_HOME/jlib:$ORACLE_HOME/rdbms/jlib
+umask 022
+
+cd $ORACLE_HOME
+export CV_ASSUME_DISTID=OEL8
+./runInstaller
