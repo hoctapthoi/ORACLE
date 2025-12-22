@@ -45,8 +45,9 @@ groupadd -g 54329 asmadmin
 useradd -u 54322 -g oinstall -G dba,oper,asmdba,asmoper,asmadmin,racdba grid
 usermod -G asmdba,asmoper,asmadmin oracle
 echo "123" | sudo passwd --stdin grid
-
 echo "123" | sudo passwd --stdin oracle
+hoặc  echo "grid:123"   | sudo chpasswd
+      echo "oracle:123" | sudo chpasswd
 
 #yum install -y kmod-redhat-oracleasm.x86_64
 
