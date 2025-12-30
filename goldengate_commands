@@ -1,0 +1,4 @@
+-- check thông tin capture hiện tại ------
+SELECT capture_name, status, captured_scn, applied_scn, 
+       logminer_id, purpose
+FROM DBA_CAPTURE;
