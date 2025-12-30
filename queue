@@ -1,0 +1,27 @@
+########## check queue list ##########
+SELECT 
+    owner, 
+    name, 
+    enqueue_enabled, 
+    dequeue_enabled 
+FROM dba_queues 
+-- WHERE name = 'YOUR_QUEUE_NAME'
+WHERE name in (...)
+-- ENQUEUE_ENABLED = 'YES': You can add messages to the queue.
+-- DEQUEUE_ENABLED = 'YES': You can consume messages from the queue.
+
+########## Start and enable queue ##########
+BEGIN
+    DBMS_AQADM.START_QUEUE(
+        queue_name => 'YOUR_QUEUE_NAME',
+        enqueue    => TRUE,
+        dequeue    => TRUE
+    );
+END;
+/
+
+########## Stop queue ##########
+BEGIN
+    DBMS_AQADM.STOP_QUEUE(queue_name => 'YOUR_QUEUE_NAME');
+END;
+/
