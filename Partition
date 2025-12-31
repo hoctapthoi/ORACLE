@@ -1,0 +1,67 @@
+########### check partition status ##############
+SELECT 
+    pt.owner, pt.table_name, pt.partitioning_type, pt.def_tablespace_name, 
+    kc.column_name column_key, pt.partition_count
+FROM dba_part_tables pt
+JOIN dba_part_key_columns kc 
+    ON    pt.owner = kc.owner 
+    AND   pt.table_name = kc.name 
+WHERE pt.owner NOT IN ('SYSTEM', 'SYS')
+
+SELECT owner, segment_name, partition_name, segment_type, Bytes/1024/1024 Size_MB
+FROM DBA_segments 
+WHERE segment_type = 'TABLE PARTITION'
+--    AND segment_name like 'xxx%' ,
+AND owner not in ('SYS', 'SYSTEM')
+ORDER BY owner, segment_name, partition_name
+
+########### convert non-partitioned table to partitioned table ############
+-- tự động tạo, thực hiện 1 lần duy nhất, không cần quan tâm sau này
+ALTER TABLE orders MODIFY
+    PARTITION BY RANGE (order_date) 
+    INTERVAL (NUMTOYMINTERVAL(1,'MONTH'))
+    (
+        PARTITION p_before_2025 VALUES LESS THAN (TO_DATE('2024-01-01','YYYY-MM-DD'))
+    ) ONLINE;
+
+-- auto gen ALTER cho nhiều bảng 
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    TYPE table_info_rec IS RECORD (
+        table_name VARCHAR2(30),
+        date_column VARCHAR2(30),
+        partition_prefix VARCHAR2(30)
+    );
+    
+    TYPE table_list IS TABLE OF table_info_rec;
+    
+    v_tables table_list := table_list(
+        table_info_rec('ORDERS', 'ORDER_DATE', 'p_orders'),
+        table_info_rec('SALES', 'SALE_DATE', 'p_sales'),
+        table_info_rec('INVOICES', 'INVOICE_DATE', 'p_invoices'),
+        table_info_rec('SHIPMENTS', 'SHIP_DATE', 'p_shipments'),
+        table_info_rec('PAYMENTS', 'PAYMENT_DATE', 'p_payments')
+    );
+    
+    v_sql VARCHAR2(4000);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE('-- Generated ALTER TABLE statements');
+    DBMS_OUTPUT.PUT_LINE('-- Date: ' || TO_CHAR(SYSDATE, 'YYYY-MM-DD HH24:MI:SS'));
+    DBMS_OUTPUT.PUT_LINE('');
+    
+    FOR i IN 1..v_tables.COUNT LOOP
+        v_sql := 'ALTER TABLE ' || v_tables(i).table_name || ' MODIFY' || CHR(10) ||
+                 '    PARTITION BY RANGE (' || v_tables(i).date_column || ')' || CHR(10) ||
+                 '    INTERVAL (NUMTOYMINTERVAL(1,''MONTH''))' || CHR(10) ||
+                 '    (' || CHR(10) ||
+                 '        PARTITION ' || v_tables(i).partition_prefix || '_before_2025 ' ||
+                 'VALUES LESS THAN (TO_DATE(''2024-01-01'',''YYYY-MM-DD''))' || CHR(10) ||
+                 '    ) ONLINE;';
+        
+        DBMS_OUTPUT.PUT_LINE(v_sql);
+        DBMS_OUTPUT.PUT_LINE('');
+    END LOOP;
+END;
+/
