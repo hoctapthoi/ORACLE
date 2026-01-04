@@ -1,0 +1,75 @@
+######### Patching #########
+### backup database before update ###
+# 1. BACKUP TOÀN BỘ database
+RMAN> BACKUP DATABASE PLUS ARCHIVELOG;
+
+# 2. Backup controlfile
+ALTER DATABASE BACKUP CONTROLFILE TO TRACE;
+
+# 3. Export registry info
+SQL> SELECT * FROM dba_registry_sqlpatch;
+
+### check patch validation  _ ex: patch no = 35943157 ###
+export PATH=$PATH:#ORACLE_HOME/OPatch
+
+unzip p35943157_190000_Linux-x86-64
+cd 35943157
+opatch lsinventory | grep 35943157
+opatch apply -report
+
+### upgrade OPatch (if need)
+opatch version 
+cd $ORACLE_HOME/
+mv OPatch/ OPatch.old/
+tar -cvf OPatch_backup.tar OPatch.old/
+unzip p6880880_190000_Linux-x86-64
+opatch version
+
+### apply patch for software binary ###
+# patch validation #
+opatch apply -report
+
+# shutdown database
+# apply patch
+opatch apply
+
+# patch verify #
+opatch lsinventory | grep 35943157
+Patch  35943157     : applied on Sat Jan 03 09:25:43 EST 2026
+Patch description:  "Database Release Update : 19.22.0.0.240116 (35943157)"
+or opatch lsinventory | grep "Patch desc"
+Patch description:  "Database Release Update : 19.22.0.0.240116 (35943157)"
+Patch description:  "OCW RELEASE UPDATE 19.3.0.0.0 (29585399)"
+
+### apply patch for database engine _ SQL Patch ###
+# startup database
+# datapatch verification
+datapatch -prereq
+...
+Patch 35943157 (Database Release Update : 19.22.0.0.240116 (35943157)):
+    Apply from 19.3.0.0.0 Release_Update 190410122720 to 19.22.0.0.0 Release_Update 240104023954
+...
+
+select comp_id, comp_name, version, status from dba_registry where status = 'INVALID';
+
+SELECT patch_id, status, description FROM dba_registry_sqlpatch;
+
+
+# apply patch for database engine
+datapatch -verbose
+
+# validation
+SELECT patch_id, status, description FROM dba_registry_sqlpatch;
+  29517242 SUCCESS
+Database Release Update : 19.3.0.0.190416 (29517242)
+
+  35943157 SUCCESS
+Database Release Update : 19.22.0.0.240116 (35943157)
+
+# restart 
+# check invalid objects
+SELECT COUNT(*) FROM dba_objects WHERE status = 'INVALID';
+
+# recomplie invalid objects if need
+@?/rdbms/admin/utlrp.sql
+SELECT COUNT(*) FROM dba_objects WHERE status = 'INVALID';
