@@ -1,0 +1,29 @@
+######## 1. check active user ##########
+SELECT 
+    sid,
+    serial#,
+    status,
+    machine,
+    program,
+    sql_id
+FROM v$session
+WHERE username = 'xxx';
+
+######## 2. lock user ##########
+ALTER USER xxx ACCOUNTN LOCK;
+
+######## 3. kill sesion ########
+BEGIN
+    FOR rec IN (SELECT sid, serial# FROM v$session WHERE username = 'xxx') LOOP
+        BEGIN
+            EXECUTE IMMEDIATE 'ALTER SYSTEM KILL SESSION ''' || 
+                            rec.sid || ',' || rec.serial# || 
+                            ''' IMMEDIATE';
+            DBMS_OUTPUT.PUT_LINE('Killed: ' || rec.sid || ',' || rec.serial#);
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_OUTPUT.PUT_LINE('Warning: ' || SQLERRM);
+        END;
+    END LOOP;
+END;
+/
