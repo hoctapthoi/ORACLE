@@ -26,35 +26,34 @@ ORDER BY s.seconds_in_wait DESC;
 
 ------- running job -------
  SELECT 
-    job_name,
-    job_type,
-    job_action,
-    state,
-    enabled,
-    run_count,
-    failure_count,
-    last_start_date,
-    last_run_duration,
-    next_run_date
-FROM 
-    dba_scheduler_jobs
-WHERE 
-    state = 'RUNNING'
-ORDER BY last_start_date DESC;
+    r.job_name,
+    r.session_id AS sid,
+    s.serial#,
+    s.osuser,
+    s.program,
+    s.sql_id
+FROM dba_scheduler_running_jobs r
+JOIN v$session s ON r.session_id = s.sid
+WHERE r.job_name = 'JOB_NAME';
 
---
---BEGIN
---    DBMS_SCHEDULER.STOP_JOB(
---        job_name => 'JOB_NAME',
---        force    => TRUE
---    );
---END;
---/
+/*
+BEGIN
+    DBMS_SCHEDULER.STOP_JOB(
+        job_name => 'JOB_NAME',
+        force    => TRUE
+    );
+END;
+/
+*/
 
---BEGIN
---    DBMS_SCHEDULER.RUN_JOB(
---        job_name => 'JOB_NAME',
---        use_current_session => FALSE
---    );
---END;
---/
+/*
+BEGIN
+    DBMS_SCHEDULER.RUN_JOB(
+        job_name => 'JOB_NAME',
+        use_current_session => FALSE
+    );
+END;
+/
+*/
+
+
