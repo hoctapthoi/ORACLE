@@ -1,4 +1,10 @@
 ######### Patching #########
+### install missing package
+test:
+    perl -e 'use File::Copy;'     ==> no error
+    rpm -qa | grep gcc            ==> existing file
+    rpm -qa | grep make           ==> existing file
+
 ### backup database before update ###
 # 1. BACKUP TOÀN BỘ database
 RMAN> BACKUP DATABASE PLUS ARCHIVELOG;
@@ -73,3 +79,8 @@ SELECT COUNT(*) FROM dba_objects WHERE status = 'INVALID';
 # recomplie invalid objects if need
 @?/rdbms/admin/utlrp.sql
 SELECT COUNT(*) FROM dba_objects WHERE status = 'INVALID';
+
+##################### rollback ##################
+opatch lspatches
+opatch rollback -id 29517242
+
