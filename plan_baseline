@@ -1,4 +1,4 @@
-sql plan baselines
+============ ý nghĩa sql plan baselines ===============
 FIXED,   ENABLED,ACCEPTED, Khả năng được Optimizer sử dụng, Ý nghĩa thực tế
 YES,     YES,    YES,      Ưu tiên cao nhất,                "Plan được ""khóa"" để ép sử dụng."
 NO,      YES,    YES,      Có thể dùng,                     "Plan an toàn, dùng nếu không có Plan FIXED nào khả dụng."
@@ -29,3 +29,93 @@ END;
 hoặc
 EXECUTE IF dbms_spm.alter_sql_plan_baseline('SYS_SQL_6fe28d438dfc352f', 'SQL_PLAN_6zsnd8f6zsd9g54bc8843', 'ENABLED', 'NO') >= 0 
         THEN NULL; END IF;
+
+=========== migrate plan baselines ===============
+== 1. tạo bảng tạm chứa baselines ==
+BEGIN
+  DBMS_SPM.CREATE_STGTAB_BASELINE(
+    staging_table_name => 'MIGRATE_BASELINE_TAB',
+    staging_table_owner => 'SYSTEM' -- Bạn có thể đổi owner nếu muốn
+  );
+END;
+/
+
+==== 2. exporter ====
+== Trường hợp 1: Di chuyển toàn bộ Database / PDB ==
+Đóng gói tất cả Baseline hiện có mà không dùng bộ lọc.
+
+Tại Source (Pack):
+
+SQL >
+DECLARE
+  l_plans_packed NUMBER;
+BEGIN
+  l_plans_packed := DBMS_SPM.PACK_STGTAB_BASELINE(
+    staging_table_name => 'MIGRATE_BASELINE_TAB',
+    staging_table_owner => 'SYSTEM'
+    -- Không truyền filter để lấy toàn bộ
+  );
+  DBMS_OUTPUT.PUT_LINE('Số lượng plan đã đóng gói: ' || l_plans_packed);
+END;
+/
+== Trường hợp 2: Di chuyển ứng dụng cụ thể (Lọc theo Schema) ==
+Sử dụng tham số creator để chỉ lấy Baseline của một User cụ thể.
+
+Tại Source (Pack):
+
+SQL>
+DECLARE
+  l_plans_packed NUMBER;
+BEGIN
+  l_plans_packed := DBMS_SPM.PACK_STGTAB_BASELINE(
+    staging_table_name => 'MIGRATE_BASELINE_TAB',
+    staging_table_owner => 'SYSTEM',
+    creator             => 'APP_OWNER' -- Thay bằng tên Schema của bạn
+  );
+END;
+/
+
+== Trường hợp 3: Khắc phục lỗi cho 1 câu lệnh (Lọc theo SQL Handle) ==
+Chỉ đóng gói các Plan thuộc về một Handle cụ thể đã xác định từ trước.
+
+Tại Source (Pack):
+
+SQL>
+DECLARE
+  l_plans_packed NUMBER;
+BEGIN
+  l_plans_packed := DBMS_SPM.PACK_STGTAB_BASELINE(
+    staging_table_name => 'MIGRATE_BASELINE_TAB',
+    staging_table_owner => 'SYSTEM',
+    sql_handle          => 'SYS_SQL_6fe28d438dfc352f' -- Handle từ DBA_SQL_PLAN_BASELINES
+  );
+END;
+/
+Bước trung gian: Di chuyển bảng qua Data Pump
+Sau khi đã "Pack" xong ở Source, bạn dùng lệnh OS để di chuyển dữ liệu:
+
+Export: expdp system/pass@source_db tables=SYSTEM.MIGRATE_BASELINE_TAB directory=DATA_PUMP_DIR dumpfile=baselines.dmp
+
+Import: impdp system/pass@target_db tables=SYSTEM.MIGRATE_BASELINE_TAB directory=DATA_PUMP_DIR dumpfile=baselines.dmp
+
+==== 3. Giải nén tại máy đích (Unpack) ====
+Thực hiện lệnh này tại Database đích để đưa các Plan từ bảng tạm vào hệ thống Dictionary.
+
+Tại Target (Unpack):
+
+SQL>
+DECLARE
+  l_plans_unpacked NUMBER;
+BEGIN
+  l_plans_unpacked := DBMS_SPM.UNPACK_STGTAB_BASELINE(
+    staging_table_name => 'MIGRATE_BASELINE_TAB',
+    staging_table_owner => 'SYSTEM'
+  );
+  DBMS_OUTPUT.PUT_LINE('Số lượng plan đã giải nén vào hệ thống: ' || l_plans_unpacked);
+END;
+/
+Lưu ý: Sau khi Unpack thành công, bạn nên kiểm tra lại bằng SELECT * FROM DBA_SQL_PLAN_BASELINES.
+
+==== 4. xóa bảng tạm ====
+DROP TABLE SYSTEM.MIGRATE_BASELINE_TAB;
+TRUNCATE TABLE SYSTEM.MIGRATE_BASELINE_TAB;
