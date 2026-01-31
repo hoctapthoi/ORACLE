@@ -1,0 +1,31 @@
+sql plan baselines
+FIXED,   ENABLED,ACCEPTED, Khả năng được Optimizer sử dụng, Ý nghĩa thực tế
+YES,     YES,    YES,      Ưu tiên cao nhất,                "Plan được ""khóa"" để ép sử dụng."
+NO,      YES,    YES,      Có thể dùng,                     "Plan an toàn, dùng nếu không có Plan FIXED nào khả dụng."
+YES/NO,  NO,     YES/NO,   Không bao giờ,                   Plan bị vô hiệu hóa thủ công bởi DBA.
+NO,      YES,    NO,       Không sử dụng,                   "Plan mới (History), cần được xác minh (Evolve)."
+YES,     YES,    NO,       Không sử dụng,                   Trường hợp hiếm (sai sót logic),Plan chưa được chấp nhận thì không thể chạy."
+
+select signature, sql_handle, sql_text, plan_name, origin, enabled, accepted, fixed, autopurge
+from dba_sql_plan_baselines;
+| SIGNATURE | SQL_HANDLE      | SQL_TEXT | PLAN_NAME        | ORIGIN       | ENA | ACC | FIX | AUT |
+----------------------
+| 8.062E+18 | SYS_SQL_6fe2... | select.. | SQL_PLAN_6zsn... | AUTO-CAPTURE | YES | NO  |  NO | YES |
+| 8.062E+18 | SYS_SQL_e23f... | select.. | SQL_PLAN_f4gy... | AUTO-CAPTURE | YES | YES |  NO | YES |
+-----------------------
+
+Đổi trạng thái plan (buộc phải xuất output)
+BEGIN
+  IF dbms_spm.alter_sql_plan_baseline(
+        sql_handle     => 'SYS_SQL_6fe28d438dfc352f',
+        plan_name      => 'SQL_PLAN_6zsnd8f6zsd9g54bc8843',
+        attribute_name => 'ENABLED', 
+        attribute_value => 'NO') >= 0 
+  THEN
+     DBMS_OUTPUT.PUT_LINE('Plan đã được chuyển sang ENABLED=NO thành công.');
+  END IF;
+END;
+/
+hoặc
+EXECUTE IF dbms_spm.alter_sql_plan_baseline('SYS_SQL_6fe28d438dfc352f', 'SQL_PLAN_6zsnd8f6zsd9g54bc8843', 'ENABLED', 'NO') >= 0 
+        THEN NULL; END IF;
