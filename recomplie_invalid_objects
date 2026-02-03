@@ -1,0 +1,16 @@
+=========== su dung quyen sysdba, recomplie toàn bộ invalid object trong database
+CONN / AS SYSDBA
+@?/rdbms/admin/utlrp.sql
+
+============ recomplie normal object với role DBA cho từng schema
+---- check object missing schema
+SELECT distinct owner
+FROM dba_objects
+WHERE status = 'INVALID'
+
+---- gen script cho user/schema user_xxx
+select 'ALTER '||OBJECT_TYPE||' '||OWNER||'.'||OBJECT_NAME||' COMPILE;' from dba_objects
+where object_type in ('PROCEDURE','FUNCTION','TRIGGER','PACKAGE','TYPE','VIEW') and status like 'INVALID' and OWNER like 'user_xxx'
+UNION ALL
+select 'ALTER PACKAGE '||OWNER||'.'||OBJECT_NAME||' COMPILE BODY;' from dba_objects
+where object_type in ('PACKAGE BODY','TYPE BODY') and status like 'INVALID' and OWNER like 'user_xxx'
