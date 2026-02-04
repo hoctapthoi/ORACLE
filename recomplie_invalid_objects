@@ -2,6 +2,9 @@
 CONN / AS SYSDBA
 @?/rdbms/admin/utlrp.sql
 
+============ sử dụng quyền DBA để auto recomplie
+EXEC UTL_RECOMP.recomp_parallel(4, 'SCHEMA_NAME');
+
 ============ recomplie normal object với role DBA cho từng schema
 ---- check object missing schema
 SELECT distinct owner
