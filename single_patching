@@ -1,4 +1,7 @@
 ######### Patching #########
+### case: pre-patching for fresh patching
+./runInstaller -applyRU /u01/setup/38298204/38291812
+
 ### install missing package
 test:
     perl -e 'use File::Copy;'     ==> no error
