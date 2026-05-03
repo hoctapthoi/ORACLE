@@ -111,7 +111,7 @@ log_file_name_convert='+DATA','+DATASTB'	# cấu hình khi diskgroup nguồn và
 
 
 sqlplus / as sysdba
-startup nomount 
+startup nomount pfile=$ORACLE_HOME/dbs/initorclstb.ora
 
 III/ main config
 1. duplicate database 
@@ -137,7 +137,20 @@ a, check connection from both server
 
 b, duplicate from PRIMARY
 rman target sys/oracle@orclprod auxiliary sys/oracle@orclstb
-RAMN> duplicate target database for standby from active database nofilenamecheck;
+RMAN> duplicate target database for standby from active database nofilenamecheck;
+hoặc:
+RMAN> DUPLICATE TARGET DATABASE TO orclstb 
+FROM ACTIVE DATABASE 
+SPFILE 
+	PARAMETER_VALUE_CONVERT 'ORCLPROD','ORCLSTB' 
+	SET DB_UNIQUE_NAME='orclstb' 
+	SET AUDIT_FILE_DEST='/u01/app/oracle/admin/ORCLSTB/adump'
+	SET DB_RECOVERY_FILE_DEST='+FRA' 
+	SET CONTROL_FILES='+DATA/ORCLSTB/CONTROLFILE/control01.dbf','+FRA/ORCLSTB/CONTROLFILE/control02.dbf' 
+	SET LOG_ARCHIVE_DEST_1='LOCATION=+FRA' 
+	DB_FILE_NAME_CONVERT 'ORCLPROD','ORCLSTB' , '+DATA', '+DATASTB'
+	LOG_FILE_NAME_CONVERT 'ORCLPROD','ORCLSTB' , '+DATA', '+DATASTB'
+	NOFILENAMECHECK;
 
 2. bật redo apply on STANDBY
 alter database recover managed standby database disconnect;
